@@ -104,7 +104,7 @@ func (_ *SolverGetter) GetSolver(_ client.Client, routingClass controllerv1alpha
 	isOpenShift := infrastructure.IsOpenShift()
 	switch routingClass {
 	case controllerv1alpha1.DevWorkspaceRoutingBasic:
-		return &BasicSolver{}, nil
+		return &BasicSolver{}, nil // Pass in the config
 	case controllerv1alpha1.DevWorkspaceRoutingCluster:
 		return &ClusterSolver{}, nil
 	case controllerv1alpha1.DevWorkspaceRoutingClusterTLS, controllerv1alpha1.DevWorkspaceRoutingWebTerminal:
