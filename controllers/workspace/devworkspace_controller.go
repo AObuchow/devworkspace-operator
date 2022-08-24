@@ -110,6 +110,7 @@ func (r *DevWorkspaceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Fetch the Workspace instance
 	workspaceWithConfig := &common.DevWorkspaceWithConfig{}
+	workspaceWithConfig.Config = *config.InternalConfig
 	err = r.Get(ctx, req.NamespacedName, workspaceWithConfig)
 	if err != nil {
 		if k8sErrors.IsNotFound(err) {
@@ -128,7 +129,7 @@ func (r *DevWorkspaceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// indicated by the deletion timestamp being set.
 	if workspaceWithConfig.GetDeletionTimestamp() != nil {
 		reqLogger.Info("Finalizing DevWorkspace")
-		return r.finalize(ctx, reqLogger, &workspaceWithConfig.DevWorkspace)
+		return r.finalize(ctx, reqLogger, workspaceWithConfig)
 	}
 
 	// Ensure workspaceID is set.
@@ -149,7 +150,7 @@ func (r *DevWorkspaceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// If debug annotation is present, leave the deployment in place to let users
 		// view logs.
 		if workspaceWithConfig.Annotations[constants.DevWorkspaceDebugStartAnnotation] == "true" {
-			if isTimeout, err := checkForFailingTimeout(&workspaceWithConfig.DevWorkspace); err != nil {
+			if isTimeout, err := checkForFailingTimeout(workspaceWithConfig); err != nil {
 				return reconcile.Result{}, err
 			} else if !isTimeout {
 				return reconcile.Result{}, nil
@@ -171,7 +172,7 @@ func (r *DevWorkspaceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		timing.ClearAnnotations(&workspaceWithConfig.DevWorkspace)
 		r.removeStartedAtFromCluster(ctx, &workspaceWithConfig.DevWorkspace, reqLogger)
 		r.syncTimingToCluster(ctx, &workspaceWithConfig.DevWorkspace, map[string]string{}, reqLogger)
-		return r.stopWorkspace(ctx, &workspaceWithConfig.DevWorkspace, reqLogger)
+		return r.stopWorkspace(ctx, workspaceWithConfig, reqLogger)
 	}
 
 	// If this is the first reconcile for a starting workspace, mark it as starting now. This is done outside the regular
@@ -208,7 +209,7 @@ func (r *DevWorkspaceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// Don't accidentally suppress errors by overwriting here; only check for timeout when no error
 		// encountered in main reconcile loop.
 		if err == nil {
-			if timeoutErr := checkForStartTimeout(clusterWorkspace); timeoutErr != nil {
+			if timeoutErr := checkForStartTimeout(clusterWorkspace, workspaceWithConfig.Config); timeoutErr != nil {
 				reconcileResult, err = r.failWorkspace(&workspaceWithConfig.DevWorkspace, timeoutErr.Error(), metrics.ReasonInfrastructureFailure, reqLogger, &reconcileStatus)
 			}
 		}
@@ -241,8 +242,8 @@ func (r *DevWorkspaceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		HttpClient:         httpClient,
 	}
 
-	if wsDefaults.NeedsDefaultTemplate(&workspaceWithConfig.DevWorkspace) {
-		wsDefaults.ApplyDefaultTemplate(&workspaceWithConfig.DevWorkspace)
+	if wsDefaults.NeedsDefaultTemplate(workspaceWithConfig) {
+		wsDefaults.ApplyDefaultTemplate(workspaceWithConfig)
 	}
 
 	flattenedWorkspace, warnings, err := flatten.ResolveDevWorkspace(&workspaceWithConfig.Spec.Template, flattenHelpers)
@@ -280,18 +281,18 @@ func (r *DevWorkspaceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 
-	devfilePodAdditions, err := containerlib.GetKubeContainersFromDevfile(&workspaceWithConfig.Spec.Template)
+	devfilePodAdditions, err := containerlib.GetKubeContainersFromDevfile(&workspaceWithConfig.Spec.Template, workspaceWithConfig.Config)
 	if err != nil {
 		return r.failWorkspace(&workspaceWithConfig.DevWorkspace, fmt.Sprintf("Error processing devfile: %s", err), metrics.ReasonBadRequest, reqLogger, &reconcileStatus)
 	}
 
 	// Add common environment variables and env vars defined via workspaceEnv attribute
-	if err := env.AddCommonEnvironmentVariables(devfilePodAdditions, clusterWorkspace, &workspaceWithConfig.Spec.Template); err != nil {
+	if err := env.AddCommonEnvironmentVariables(devfilePodAdditions, clusterWorkspace, &workspaceWithConfig.Spec.Template, workspaceWithConfig.Config); err != nil {
 		return r.failWorkspace(&workspaceWithConfig.DevWorkspace, fmt.Sprintf("Failed to process workspace environment variables: %s", err), metrics.ReasonBadRequest, reqLogger, &reconcileStatus)
 	}
 
 	// Add init container to clone projects
-	if projectClone, err := projects.GetProjectCloneInitContainer(&workspaceWithConfig.Spec.Template); err != nil {
+	if projectClone, err := projects.GetProjectCloneInitContainer(workspaceWithConfig); err != nil {
 		return r.failWorkspace(&workspaceWithConfig.DevWorkspace, fmt.Sprintf("Failed to set up project-clone init container: %s", err), metrics.ReasonInfrastructureFailure, reqLogger, &reconcileStatus)
 	} else if projectClone != nil {
 		devfilePodAdditions.InitContainers = append(devfilePodAdditions.InitContainers, *projectClone)
@@ -311,7 +312,7 @@ func (r *DevWorkspaceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 
-	err = storageProvisioner.ProvisionStorage(devfilePodAdditions, &workspaceWithConfig.DevWorkspace, clusterAPI)
+	err = storageProvisioner.ProvisionStorage(devfilePodAdditions, workspaceWithConfig, clusterAPI)
 	if err != nil {
 		switch storageErr := err.(type) {
 		case *storage.NotReadyError:
@@ -426,7 +427,7 @@ func (r *DevWorkspaceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Step six: Create deployment and wait for it to be ready
 	timing.SetTime(timingInfo, timing.DeploymentCreated)
-	deploymentStatus := wsprovision.SyncDeploymentToCluster(&workspaceWithConfig.DevWorkspace, allPodAdditions, serviceAcctName, clusterAPI)
+	deploymentStatus := wsprovision.SyncDeploymentToCluster(&workspaceWithConfig.DevWorkspace, allPodAdditions, serviceAcctName, clusterAPI, &workspaceWithConfig.Config)
 	if !deploymentStatus.Continue {
 		if deploymentStatus.FailStartup {
 			failureReason := metrics.DetermineProvisioningFailureReason(deploymentStatus)
@@ -457,7 +458,7 @@ func (r *DevWorkspaceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return reconcile.Result{}, nil
 }
 
-func (r *DevWorkspaceReconciler) stopWorkspace(ctx context.Context, workspace *dw.DevWorkspace, logger logr.Logger) (reconcile.Result, error) {
+func (r *DevWorkspaceReconciler) stopWorkspace(ctx context.Context, workspace *common.DevWorkspaceWithConfig, logger logr.Logger) (reconcile.Result, error) {
 	status := currentStatus{phase: dw.DevWorkspaceStatusStopping}
 	if workspace.Status.Phase == devworkspacePhaseFailing || workspace.Status.Phase == dw.DevWorkspaceStatusFailed {
 		status.phase = workspace.Status.Phase
@@ -485,14 +486,14 @@ func (r *DevWorkspaceReconciler) stopWorkspace(ctx context.Context, workspace *d
 	if stoppedBy, ok := workspace.Annotations[constants.DevWorkspaceStopReasonAnnotation]; ok {
 		logger.Info("Workspace stopped with reason", "stopped-by", stoppedBy)
 	}
-	return r.updateWorkspaceStatus(workspace, logger, &status, reconcile.Result{}, nil)
+	return r.updateWorkspaceStatus(&workspace.DevWorkspace, logger, &status, reconcile.Result{}, nil)
 }
 
-func (r *DevWorkspaceReconciler) doStop(ctx context.Context, workspace *dw.DevWorkspace, logger logr.Logger) (stopped bool, err error) {
+func (r *DevWorkspaceReconciler) doStop(ctx context.Context, workspaceWithConfig *common.DevWorkspaceWithConfig, logger logr.Logger) (stopped bool, err error) {
 	workspaceDeployment := &appsv1.Deployment{}
 	namespaceName := types.NamespacedName{
-		Name:      common.DeploymentName(workspace.Status.DevWorkspaceId),
-		Namespace: workspace.Namespace,
+		Name:      common.DeploymentName(workspaceWithConfig.Status.DevWorkspaceId),
+		Namespace: workspaceWithConfig.Namespace,
 	}
 	err = r.Get(ctx, namespaceName, workspaceDeployment)
 	if err != nil {
@@ -505,8 +506,8 @@ func (r *DevWorkspaceReconciler) doStop(ctx context.Context, workspace *dw.DevWo
 	// Update DevWorkspaceRouting to have `devworkspace-started` annotation "false"
 	routing := &controllerv1alpha1.DevWorkspaceRouting{}
 	routingRef := types.NamespacedName{
-		Name:      common.DevWorkspaceRoutingName(workspace.Status.DevWorkspaceId),
-		Namespace: workspace.Namespace,
+		Name:      common.DevWorkspaceRoutingName(workspaceWithConfig.Status.DevWorkspaceId),
+		Namespace: workspaceWithConfig.Namespace,
 	}
 	err = r.Get(ctx, routingRef, routing)
 	if err != nil {
@@ -525,11 +526,11 @@ func (r *DevWorkspaceReconciler) doStop(ctx context.Context, workspace *dw.DevWo
 	}
 
 	// CleanupOnStop should never be nil as a default is always set
-	if config.Workspace.CleanupOnStop == nil || !*config.Workspace.CleanupOnStop {
+	if workspaceWithConfig.Config.Workspace.CleanupOnStop == nil || !*workspaceWithConfig.Config.Workspace.CleanupOnStop {
 		replicas := workspaceDeployment.Spec.Replicas
 		if replicas == nil || *replicas > 0 {
 			logger.Info("Stopping workspace")
-			err = wsprovision.ScaleDeploymentToZero(ctx, workspace, r.Client)
+			err = wsprovision.ScaleDeploymentToZero(ctx, &workspaceWithConfig.DevWorkspace, r.Client)
 			if err != nil && !k8sErrors.IsConflict(err) {
 				return false, err
 			}
@@ -539,7 +540,7 @@ func (r *DevWorkspaceReconciler) doStop(ctx context.Context, workspace *dw.DevWo
 		return workspaceDeployment.Status.Replicas == 0, nil
 	} else {
 		logger.Info("Cleaning up workspace-owned objects")
-		requeue, err := r.deleteWorkspaceOwnedObjects(ctx, workspace)
+		requeue, err := r.deleteWorkspaceOwnedObjects(ctx, &workspaceWithConfig.DevWorkspace)
 		return !requeue, err
 	}
 }
@@ -676,6 +677,7 @@ func (r *DevWorkspaceReconciler) dwPVCHandler(obj client.Object) []reconcile.Req
 		}
 	}
 
+	// TODO: Address this usage of global config?
 	// Otherwise, check if common PVC is deleted to make sure all DevWorkspaces see it happen
 	if obj.GetName() != config.Workspace.PVCName || obj.GetDeletionTimestamp() == nil {
 		// We're looking for a deleted common PVC
