@@ -297,15 +297,1538 @@ func mergeConfig(from, to *controller.OperatorConfiguration) {
 	}
 }
 
-func unTestedFunction(newConfig *controller.DevWorkspaceOperatorConfig) {
-	if newConfig == nil || newConfig.Name != OperatorConfigName || newConfig.Namespace != configNamespace {
+func unTestedFunction(from, to *controller.OperatorConfiguration) {
+	if to == nil {
+		to = &controller.OperatorConfiguration{}
+	}
+	if from == nil {
 		return
 	}
-	configMutex.Lock()
-	defer configMutex.Unlock()
-	internalConfig = defaultConfig.DeepCopy()
-	mergeConfig(newConfig.Config, internalConfig)
-	logCurrentConfig()
+	if from.EnableExperimentalFeatures != nil {
+		to.EnableExperimentalFeatures = from.EnableExperimentalFeatures
+	}
+	if from.Routing != nil {
+		if to.Routing == nil {
+			to.Routing = &controller.RoutingConfig{}
+		}
+		if from.Routing.DefaultRoutingClass != "" {
+			to.Routing.DefaultRoutingClass = from.Routing.DefaultRoutingClass
+		}
+		if from.Routing.ClusterHostSuffix != "" {
+			to.Routing.ClusterHostSuffix = from.Routing.ClusterHostSuffix
+		}
+		if from.Routing.ProxyConfig != nil {
+			if to.Routing.ProxyConfig == nil {
+				to.Routing.ProxyConfig = &controller.Proxy{}
+			}
+			to.Routing.ProxyConfig = proxy.MergeProxyConfigs(from.Routing.ProxyConfig, defaultConfig.Routing.ProxyConfig)
+		}
+	}
+	if from.Workspace != nil {
+		if to.Workspace == nil {
+			to.Workspace = &controller.WorkspaceConfig{}
+		}
+		if from.Workspace.StorageClassName != nil {
+			to.Workspace.StorageClassName = from.Workspace.StorageClassName
+		}
+		if from.Workspace.PVCName != "" {
+			to.Workspace.PVCName = from.Workspace.PVCName
+		}
+		if from.Workspace.ImagePullPolicy != "" {
+			to.Workspace.ImagePullPolicy = from.Workspace.ImagePullPolicy
+		}
+		if from.Workspace.IdleTimeout != "" {
+			to.Workspace.IdleTimeout = from.Workspace.IdleTimeout
+		}
+		if from.Workspace.ProgressTimeout != "" {
+			to.Workspace.ProgressTimeout = from.Workspace.ProgressTimeout
+		}
+		if from.Workspace.IgnoredUnrecoverableEvents != nil {
+			to.Workspace.IgnoredUnrecoverableEvents = from.Workspace.IgnoredUnrecoverableEvents
+		}
+		if from.Workspace.CleanupOnStop != nil {
+			to.Workspace.CleanupOnStop = from.Workspace.CleanupOnStop
+		}
+		if from.Workspace.PodSecurityContext != nil {
+			to.Workspace.PodSecurityContext = from.Workspace.PodSecurityContext
+		}
+		if from.Workspace.DefaultStorageSize != nil {
+			if to.Workspace.DefaultStorageSize == nil {
+				to.Workspace.DefaultStorageSize = &controller.StorageSizes{}
+			}
+			if from.Workspace.DefaultStorageSize.Common != nil {
+				commonSizeCopy := from.Workspace.DefaultStorageSize.Common.DeepCopy()
+				to.Workspace.DefaultStorageSize.Common = &commonSizeCopy
+			}
+			if from.Workspace.DefaultStorageSize.PerWorkspace != nil {
+				perWorkspaceSizeCopy := from.Workspace.DefaultStorageSize.PerWorkspace.DeepCopy()
+				to.Workspace.DefaultStorageSize.PerWorkspace = &perWorkspaceSizeCopy
+			}
+		}
+		if from.Workspace.DefaultTemplate != nil {
+			templateSpecContentCopy := from.Workspace.DefaultTemplate.DeepCopy()
+			to.Workspace.DefaultTemplate = templateSpecContentCopy
+		}
+	}
+
+	if to == nil {
+		to = &controller.OperatorConfiguration{}
+	}
+	if from == nil {
+		return
+	}
+	if from.EnableExperimentalFeatures != nil {
+		to.EnableExperimentalFeatures = from.EnableExperimentalFeatures
+	}
+	if from.Routing != nil {
+		if to.Routing == nil {
+			to.Routing = &controller.RoutingConfig{}
+		}
+		if from.Routing.DefaultRoutingClass != "" {
+			to.Routing.DefaultRoutingClass = from.Routing.DefaultRoutingClass
+		}
+		if from.Routing.ClusterHostSuffix != "" {
+			to.Routing.ClusterHostSuffix = from.Routing.ClusterHostSuffix
+		}
+		if from.Routing.ProxyConfig != nil {
+			if to.Routing.ProxyConfig == nil {
+				to.Routing.ProxyConfig = &controller.Proxy{}
+			}
+			to.Routing.ProxyConfig = proxy.MergeProxyConfigs(from.Routing.ProxyConfig, defaultConfig.Routing.ProxyConfig)
+		}
+	}
+	if from.Workspace != nil {
+		if to.Workspace == nil {
+			to.Workspace = &controller.WorkspaceConfig{}
+		}
+		if from.Workspace.StorageClassName != nil {
+			to.Workspace.StorageClassName = from.Workspace.StorageClassName
+		}
+		if from.Workspace.PVCName != "" {
+			to.Workspace.PVCName = from.Workspace.PVCName
+		}
+		if from.Workspace.ImagePullPolicy != "" {
+			to.Workspace.ImagePullPolicy = from.Workspace.ImagePullPolicy
+		}
+		if from.Workspace.IdleTimeout != "" {
+			to.Workspace.IdleTimeout = from.Workspace.IdleTimeout
+		}
+		if from.Workspace.ProgressTimeout != "" {
+			to.Workspace.ProgressTimeout = from.Workspace.ProgressTimeout
+		}
+		if from.Workspace.IgnoredUnrecoverableEvents != nil {
+			to.Workspace.IgnoredUnrecoverableEvents = from.Workspace.IgnoredUnrecoverableEvents
+		}
+		if from.Workspace.CleanupOnStop != nil {
+			to.Workspace.CleanupOnStop = from.Workspace.CleanupOnStop
+		}
+		if from.Workspace.PodSecurityContext != nil {
+			to.Workspace.PodSecurityContext = from.Workspace.PodSecurityContext
+		}
+		if from.Workspace.DefaultStorageSize != nil {
+			if to.Workspace.DefaultStorageSize == nil {
+				to.Workspace.DefaultStorageSize = &controller.StorageSizes{}
+			}
+			if from.Workspace.DefaultStorageSize.Common != nil {
+				commonSizeCopy := from.Workspace.DefaultStorageSize.Common.DeepCopy()
+				to.Workspace.DefaultStorageSize.Common = &commonSizeCopy
+			}
+			if from.Workspace.DefaultStorageSize.PerWorkspace != nil {
+				perWorkspaceSizeCopy := from.Workspace.DefaultStorageSize.PerWorkspace.DeepCopy()
+				to.Workspace.DefaultStorageSize.PerWorkspace = &perWorkspaceSizeCopy
+			}
+		}
+		if from.Workspace.DefaultTemplate != nil {
+			templateSpecContentCopy := from.Workspace.DefaultTemplate.DeepCopy()
+			to.Workspace.DefaultTemplate = templateSpecContentCopy
+		}
+	}
+
+	if to == nil {
+		to = &controller.OperatorConfiguration{}
+	}
+	if from == nil {
+		return
+	}
+	if from.EnableExperimentalFeatures != nil {
+		to.EnableExperimentalFeatures = from.EnableExperimentalFeatures
+	}
+	if from.Routing != nil {
+		if to.Routing == nil {
+			to.Routing = &controller.RoutingConfig{}
+		}
+		if from.Routing.DefaultRoutingClass != "" {
+			to.Routing.DefaultRoutingClass = from.Routing.DefaultRoutingClass
+		}
+		if from.Routing.ClusterHostSuffix != "" {
+			to.Routing.ClusterHostSuffix = from.Routing.ClusterHostSuffix
+		}
+		if from.Routing.ProxyConfig != nil {
+			if to.Routing.ProxyConfig == nil {
+				to.Routing.ProxyConfig = &controller.Proxy{}
+			}
+			to.Routing.ProxyConfig = proxy.MergeProxyConfigs(from.Routing.ProxyConfig, defaultConfig.Routing.ProxyConfig)
+		}
+	}
+	if from.Workspace != nil {
+		if to.Workspace == nil {
+			to.Workspace = &controller.WorkspaceConfig{}
+		}
+		if from.Workspace.StorageClassName != nil {
+			to.Workspace.StorageClassName = from.Workspace.StorageClassName
+		}
+		if from.Workspace.PVCName != "" {
+			to.Workspace.PVCName = from.Workspace.PVCName
+		}
+		if from.Workspace.ImagePullPolicy != "" {
+			to.Workspace.ImagePullPolicy = from.Workspace.ImagePullPolicy
+		}
+		if from.Workspace.IdleTimeout != "" {
+			to.Workspace.IdleTimeout = from.Workspace.IdleTimeout
+		}
+		if from.Workspace.ProgressTimeout != "" {
+			to.Workspace.ProgressTimeout = from.Workspace.ProgressTimeout
+		}
+		if from.Workspace.IgnoredUnrecoverableEvents != nil {
+			to.Workspace.IgnoredUnrecoverableEvents = from.Workspace.IgnoredUnrecoverableEvents
+		}
+		if from.Workspace.CleanupOnStop != nil {
+			to.Workspace.CleanupOnStop = from.Workspace.CleanupOnStop
+		}
+		if from.Workspace.PodSecurityContext != nil {
+			to.Workspace.PodSecurityContext = from.Workspace.PodSecurityContext
+		}
+		if from.Workspace.DefaultStorageSize != nil {
+			if to.Workspace.DefaultStorageSize == nil {
+				to.Workspace.DefaultStorageSize = &controller.StorageSizes{}
+			}
+			if from.Workspace.DefaultStorageSize.Common != nil {
+				commonSizeCopy := from.Workspace.DefaultStorageSize.Common.DeepCopy()
+				to.Workspace.DefaultStorageSize.Common = &commonSizeCopy
+			}
+			if from.Workspace.DefaultStorageSize.PerWorkspace != nil {
+				perWorkspaceSizeCopy := from.Workspace.DefaultStorageSize.PerWorkspace.DeepCopy()
+				to.Workspace.DefaultStorageSize.PerWorkspace = &perWorkspaceSizeCopy
+			}
+		}
+		if from.Workspace.DefaultTemplate != nil {
+			templateSpecContentCopy := from.Workspace.DefaultTemplate.DeepCopy()
+			to.Workspace.DefaultTemplate = templateSpecContentCopy
+		}
+	}
+	if to == nil {
+		to = &controller.OperatorConfiguration{}
+	}
+	if from == nil {
+		return
+	}
+	if from.EnableExperimentalFeatures != nil {
+		to.EnableExperimentalFeatures = from.EnableExperimentalFeatures
+	}
+	if from.Routing != nil {
+		if to.Routing == nil {
+			to.Routing = &controller.RoutingConfig{}
+		}
+		if from.Routing.DefaultRoutingClass != "" {
+			to.Routing.DefaultRoutingClass = from.Routing.DefaultRoutingClass
+		}
+		if from.Routing.ClusterHostSuffix != "" {
+			to.Routing.ClusterHostSuffix = from.Routing.ClusterHostSuffix
+		}
+		if from.Routing.ProxyConfig != nil {
+			if to.Routing.ProxyConfig == nil {
+				to.Routing.ProxyConfig = &controller.Proxy{}
+			}
+			to.Routing.ProxyConfig = proxy.MergeProxyConfigs(from.Routing.ProxyConfig, defaultConfig.Routing.ProxyConfig)
+		}
+	}
+	if from.Workspace != nil {
+		if to.Workspace == nil {
+			to.Workspace = &controller.WorkspaceConfig{}
+		}
+		if from.Workspace.StorageClassName != nil {
+			to.Workspace.StorageClassName = from.Workspace.StorageClassName
+		}
+		if from.Workspace.PVCName != "" {
+			to.Workspace.PVCName = from.Workspace.PVCName
+		}
+		if from.Workspace.ImagePullPolicy != "" {
+			to.Workspace.ImagePullPolicy = from.Workspace.ImagePullPolicy
+		}
+		if from.Workspace.IdleTimeout != "" {
+			to.Workspace.IdleTimeout = from.Workspace.IdleTimeout
+		}
+		if from.Workspace.ProgressTimeout != "" {
+			to.Workspace.ProgressTimeout = from.Workspace.ProgressTimeout
+		}
+		if from.Workspace.IgnoredUnrecoverableEvents != nil {
+			to.Workspace.IgnoredUnrecoverableEvents = from.Workspace.IgnoredUnrecoverableEvents
+		}
+		if from.Workspace.CleanupOnStop != nil {
+			to.Workspace.CleanupOnStop = from.Workspace.CleanupOnStop
+		}
+		if from.Workspace.PodSecurityContext != nil {
+			to.Workspace.PodSecurityContext = from.Workspace.PodSecurityContext
+		}
+		if from.Workspace.DefaultStorageSize != nil {
+			if to.Workspace.DefaultStorageSize == nil {
+				to.Workspace.DefaultStorageSize = &controller.StorageSizes{}
+			}
+			if from.Workspace.DefaultStorageSize.Common != nil {
+				commonSizeCopy := from.Workspace.DefaultStorageSize.Common.DeepCopy()
+				to.Workspace.DefaultStorageSize.Common = &commonSizeCopy
+			}
+			if from.Workspace.DefaultStorageSize.PerWorkspace != nil {
+				perWorkspaceSizeCopy := from.Workspace.DefaultStorageSize.PerWorkspace.DeepCopy()
+				to.Workspace.DefaultStorageSize.PerWorkspace = &perWorkspaceSizeCopy
+			}
+		}
+		if from.Workspace.DefaultTemplate != nil {
+			templateSpecContentCopy := from.Workspace.DefaultTemplate.DeepCopy()
+			to.Workspace.DefaultTemplate = templateSpecContentCopy
+		}
+	}
+
+	if to == nil {
+		to = &controller.OperatorConfiguration{}
+	}
+	if from == nil {
+		return
+	}
+	if from.EnableExperimentalFeatures != nil {
+		to.EnableExperimentalFeatures = from.EnableExperimentalFeatures
+	}
+	if from.Routing != nil {
+		if to.Routing == nil {
+			to.Routing = &controller.RoutingConfig{}
+		}
+		if from.Routing.DefaultRoutingClass != "" {
+			to.Routing.DefaultRoutingClass = from.Routing.DefaultRoutingClass
+		}
+		if from.Routing.ClusterHostSuffix != "" {
+			to.Routing.ClusterHostSuffix = from.Routing.ClusterHostSuffix
+		}
+		if from.Routing.ProxyConfig != nil {
+			if to.Routing.ProxyConfig == nil {
+				to.Routing.ProxyConfig = &controller.Proxy{}
+			}
+			to.Routing.ProxyConfig = proxy.MergeProxyConfigs(from.Routing.ProxyConfig, defaultConfig.Routing.ProxyConfig)
+		}
+	}
+	if from.Workspace != nil {
+		if to.Workspace == nil {
+			to.Workspace = &controller.WorkspaceConfig{}
+		}
+		if from.Workspace.StorageClassName != nil {
+			to.Workspace.StorageClassName = from.Workspace.StorageClassName
+		}
+		if from.Workspace.PVCName != "" {
+			to.Workspace.PVCName = from.Workspace.PVCName
+		}
+		if from.Workspace.ImagePullPolicy != "" {
+			to.Workspace.ImagePullPolicy = from.Workspace.ImagePullPolicy
+		}
+		if from.Workspace.IdleTimeout != "" {
+			to.Workspace.IdleTimeout = from.Workspace.IdleTimeout
+		}
+		if from.Workspace.ProgressTimeout != "" {
+			to.Workspace.ProgressTimeout = from.Workspace.ProgressTimeout
+		}
+		if from.Workspace.IgnoredUnrecoverableEvents != nil {
+			to.Workspace.IgnoredUnrecoverableEvents = from.Workspace.IgnoredUnrecoverableEvents
+		}
+		if from.Workspace.CleanupOnStop != nil {
+			to.Workspace.CleanupOnStop = from.Workspace.CleanupOnStop
+		}
+		if from.Workspace.PodSecurityContext != nil {
+			to.Workspace.PodSecurityContext = from.Workspace.PodSecurityContext
+		}
+		if from.Workspace.DefaultStorageSize != nil {
+			if to.Workspace.DefaultStorageSize == nil {
+				to.Workspace.DefaultStorageSize = &controller.StorageSizes{}
+			}
+			if from.Workspace.DefaultStorageSize.Common != nil {
+				commonSizeCopy := from.Workspace.DefaultStorageSize.Common.DeepCopy()
+				to.Workspace.DefaultStorageSize.Common = &commonSizeCopy
+			}
+			if from.Workspace.DefaultStorageSize.PerWorkspace != nil {
+				perWorkspaceSizeCopy := from.Workspace.DefaultStorageSize.PerWorkspace.DeepCopy()
+				to.Workspace.DefaultStorageSize.PerWorkspace = &perWorkspaceSizeCopy
+			}
+		}
+		if from.Workspace.DefaultTemplate != nil {
+			templateSpecContentCopy := from.Workspace.DefaultTemplate.DeepCopy()
+			to.Workspace.DefaultTemplate = templateSpecContentCopy
+		}
+	}
+
+	if to == nil {
+		to = &controller.OperatorConfiguration{}
+	}
+	if from == nil {
+		return
+	}
+	if from.EnableExperimentalFeatures != nil {
+		to.EnableExperimentalFeatures = from.EnableExperimentalFeatures
+	}
+	if from.Routing != nil {
+		if to.Routing == nil {
+			to.Routing = &controller.RoutingConfig{}
+		}
+		if from.Routing.DefaultRoutingClass != "" {
+			to.Routing.DefaultRoutingClass = from.Routing.DefaultRoutingClass
+		}
+		if from.Routing.ClusterHostSuffix != "" {
+			to.Routing.ClusterHostSuffix = from.Routing.ClusterHostSuffix
+		}
+		if from.Routing.ProxyConfig != nil {
+			if to.Routing.ProxyConfig == nil {
+				to.Routing.ProxyConfig = &controller.Proxy{}
+			}
+			to.Routing.ProxyConfig = proxy.MergeProxyConfigs(from.Routing.ProxyConfig, defaultConfig.Routing.ProxyConfig)
+		}
+	}
+	if from.Workspace != nil {
+		if to.Workspace == nil {
+			to.Workspace = &controller.WorkspaceConfig{}
+		}
+		if from.Workspace.StorageClassName != nil {
+			to.Workspace.StorageClassName = from.Workspace.StorageClassName
+		}
+		if from.Workspace.PVCName != "" {
+			to.Workspace.PVCName = from.Workspace.PVCName
+		}
+		if from.Workspace.ImagePullPolicy != "" {
+			to.Workspace.ImagePullPolicy = from.Workspace.ImagePullPolicy
+		}
+		if from.Workspace.IdleTimeout != "" {
+			to.Workspace.IdleTimeout = from.Workspace.IdleTimeout
+		}
+		if from.Workspace.ProgressTimeout != "" {
+			to.Workspace.ProgressTimeout = from.Workspace.ProgressTimeout
+		}
+		if from.Workspace.IgnoredUnrecoverableEvents != nil {
+			to.Workspace.IgnoredUnrecoverableEvents = from.Workspace.IgnoredUnrecoverableEvents
+		}
+		if from.Workspace.CleanupOnStop != nil {
+			to.Workspace.CleanupOnStop = from.Workspace.CleanupOnStop
+		}
+		if from.Workspace.PodSecurityContext != nil {
+			to.Workspace.PodSecurityContext = from.Workspace.PodSecurityContext
+		}
+		if from.Workspace.DefaultStorageSize != nil {
+			if to.Workspace.DefaultStorageSize == nil {
+				to.Workspace.DefaultStorageSize = &controller.StorageSizes{}
+			}
+			if from.Workspace.DefaultStorageSize.Common != nil {
+				commonSizeCopy := from.Workspace.DefaultStorageSize.Common.DeepCopy()
+				to.Workspace.DefaultStorageSize.Common = &commonSizeCopy
+			}
+			if from.Workspace.DefaultStorageSize.PerWorkspace != nil {
+				perWorkspaceSizeCopy := from.Workspace.DefaultStorageSize.PerWorkspace.DeepCopy()
+				to.Workspace.DefaultStorageSize.PerWorkspace = &perWorkspaceSizeCopy
+			}
+		}
+		if from.Workspace.DefaultTemplate != nil {
+			templateSpecContentCopy := from.Workspace.DefaultTemplate.DeepCopy()
+			to.Workspace.DefaultTemplate = templateSpecContentCopy
+		}
+	}
+
+	if to == nil {
+		to = &controller.OperatorConfiguration{}
+	}
+	if from == nil {
+		return
+	}
+	if from.EnableExperimentalFeatures != nil {
+		to.EnableExperimentalFeatures = from.EnableExperimentalFeatures
+	}
+	if from.Routing != nil {
+		if to.Routing == nil {
+			to.Routing = &controller.RoutingConfig{}
+		}
+		if from.Routing.DefaultRoutingClass != "" {
+			to.Routing.DefaultRoutingClass = from.Routing.DefaultRoutingClass
+		}
+		if from.Routing.ClusterHostSuffix != "" {
+			to.Routing.ClusterHostSuffix = from.Routing.ClusterHostSuffix
+		}
+		if from.Routing.ProxyConfig != nil {
+			if to.Routing.ProxyConfig == nil {
+				to.Routing.ProxyConfig = &controller.Proxy{}
+			}
+			to.Routing.ProxyConfig = proxy.MergeProxyConfigs(from.Routing.ProxyConfig, defaultConfig.Routing.ProxyConfig)
+		}
+	}
+	if from.Workspace != nil {
+		if to.Workspace == nil {
+			to.Workspace = &controller.WorkspaceConfig{}
+		}
+		if from.Workspace.StorageClassName != nil {
+			to.Workspace.StorageClassName = from.Workspace.StorageClassName
+		}
+		if from.Workspace.PVCName != "" {
+			to.Workspace.PVCName = from.Workspace.PVCName
+		}
+		if from.Workspace.ImagePullPolicy != "" {
+			to.Workspace.ImagePullPolicy = from.Workspace.ImagePullPolicy
+		}
+		if from.Workspace.IdleTimeout != "" {
+			to.Workspace.IdleTimeout = from.Workspace.IdleTimeout
+		}
+		if from.Workspace.ProgressTimeout != "" {
+			to.Workspace.ProgressTimeout = from.Workspace.ProgressTimeout
+		}
+		if from.Workspace.IgnoredUnrecoverableEvents != nil {
+			to.Workspace.IgnoredUnrecoverableEvents = from.Workspace.IgnoredUnrecoverableEvents
+		}
+		if from.Workspace.CleanupOnStop != nil {
+			to.Workspace.CleanupOnStop = from.Workspace.CleanupOnStop
+		}
+		if from.Workspace.PodSecurityContext != nil {
+			to.Workspace.PodSecurityContext = from.Workspace.PodSecurityContext
+		}
+		if from.Workspace.DefaultStorageSize != nil {
+			if to.Workspace.DefaultStorageSize == nil {
+				to.Workspace.DefaultStorageSize = &controller.StorageSizes{}
+			}
+			if from.Workspace.DefaultStorageSize.Common != nil {
+				commonSizeCopy := from.Workspace.DefaultStorageSize.Common.DeepCopy()
+				to.Workspace.DefaultStorageSize.Common = &commonSizeCopy
+			}
+			if from.Workspace.DefaultStorageSize.PerWorkspace != nil {
+				perWorkspaceSizeCopy := from.Workspace.DefaultStorageSize.PerWorkspace.DeepCopy()
+				to.Workspace.DefaultStorageSize.PerWorkspace = &perWorkspaceSizeCopy
+			}
+		}
+		if from.Workspace.DefaultTemplate != nil {
+			templateSpecContentCopy := from.Workspace.DefaultTemplate.DeepCopy()
+			to.Workspace.DefaultTemplate = templateSpecContentCopy
+		}
+	}
+
+	if to == nil {
+		to = &controller.OperatorConfiguration{}
+	}
+	if from == nil {
+		return
+	}
+	if from.EnableExperimentalFeatures != nil {
+		to.EnableExperimentalFeatures = from.EnableExperimentalFeatures
+	}
+	if from.Routing != nil {
+		if to.Routing == nil {
+			to.Routing = &controller.RoutingConfig{}
+		}
+		if from.Routing.DefaultRoutingClass != "" {
+			to.Routing.DefaultRoutingClass = from.Routing.DefaultRoutingClass
+		}
+		if from.Routing.ClusterHostSuffix != "" {
+			to.Routing.ClusterHostSuffix = from.Routing.ClusterHostSuffix
+		}
+		if from.Routing.ProxyConfig != nil {
+			if to.Routing.ProxyConfig == nil {
+				to.Routing.ProxyConfig = &controller.Proxy{}
+			}
+			to.Routing.ProxyConfig = proxy.MergeProxyConfigs(from.Routing.ProxyConfig, defaultConfig.Routing.ProxyConfig)
+		}
+	}
+	if from.Workspace != nil {
+		if to.Workspace == nil {
+			to.Workspace = &controller.WorkspaceConfig{}
+		}
+		if from.Workspace.StorageClassName != nil {
+			to.Workspace.StorageClassName = from.Workspace.StorageClassName
+		}
+		if from.Workspace.PVCName != "" {
+			to.Workspace.PVCName = from.Workspace.PVCName
+		}
+		if from.Workspace.ImagePullPolicy != "" {
+			to.Workspace.ImagePullPolicy = from.Workspace.ImagePullPolicy
+		}
+		if from.Workspace.IdleTimeout != "" {
+			to.Workspace.IdleTimeout = from.Workspace.IdleTimeout
+		}
+		if from.Workspace.ProgressTimeout != "" {
+			to.Workspace.ProgressTimeout = from.Workspace.ProgressTimeout
+		}
+		if from.Workspace.IgnoredUnrecoverableEvents != nil {
+			to.Workspace.IgnoredUnrecoverableEvents = from.Workspace.IgnoredUnrecoverableEvents
+		}
+		if from.Workspace.CleanupOnStop != nil {
+			to.Workspace.CleanupOnStop = from.Workspace.CleanupOnStop
+		}
+		if from.Workspace.PodSecurityContext != nil {
+			to.Workspace.PodSecurityContext = from.Workspace.PodSecurityContext
+		}
+		if from.Workspace.DefaultStorageSize != nil {
+			if to.Workspace.DefaultStorageSize == nil {
+				to.Workspace.DefaultStorageSize = &controller.StorageSizes{}
+			}
+			if from.Workspace.DefaultStorageSize.Common != nil {
+				commonSizeCopy := from.Workspace.DefaultStorageSize.Common.DeepCopy()
+				to.Workspace.DefaultStorageSize.Common = &commonSizeCopy
+			}
+			if from.Workspace.DefaultStorageSize.PerWorkspace != nil {
+				perWorkspaceSizeCopy := from.Workspace.DefaultStorageSize.PerWorkspace.DeepCopy()
+				to.Workspace.DefaultStorageSize.PerWorkspace = &perWorkspaceSizeCopy
+			}
+		}
+		if from.Workspace.DefaultTemplate != nil {
+			templateSpecContentCopy := from.Workspace.DefaultTemplate.DeepCopy()
+			to.Workspace.DefaultTemplate = templateSpecContentCopy
+		}
+	}
+
+	if to == nil {
+		to = &controller.OperatorConfiguration{}
+	}
+	if from == nil {
+		return
+	}
+	if from.EnableExperimentalFeatures != nil {
+		to.EnableExperimentalFeatures = from.EnableExperimentalFeatures
+	}
+	if from.Routing != nil {
+		if to.Routing == nil {
+			to.Routing = &controller.RoutingConfig{}
+		}
+		if from.Routing.DefaultRoutingClass != "" {
+			to.Routing.DefaultRoutingClass = from.Routing.DefaultRoutingClass
+		}
+		if from.Routing.ClusterHostSuffix != "" {
+			to.Routing.ClusterHostSuffix = from.Routing.ClusterHostSuffix
+		}
+		if from.Routing.ProxyConfig != nil {
+			if to.Routing.ProxyConfig == nil {
+				to.Routing.ProxyConfig = &controller.Proxy{}
+			}
+			to.Routing.ProxyConfig = proxy.MergeProxyConfigs(from.Routing.ProxyConfig, defaultConfig.Routing.ProxyConfig)
+		}
+	}
+	if from.Workspace != nil {
+		if to.Workspace == nil {
+			to.Workspace = &controller.WorkspaceConfig{}
+		}
+		if from.Workspace.StorageClassName != nil {
+			to.Workspace.StorageClassName = from.Workspace.StorageClassName
+		}
+		if from.Workspace.PVCName != "" {
+			to.Workspace.PVCName = from.Workspace.PVCName
+		}
+		if from.Workspace.ImagePullPolicy != "" {
+			to.Workspace.ImagePullPolicy = from.Workspace.ImagePullPolicy
+		}
+		if from.Workspace.IdleTimeout != "" {
+			to.Workspace.IdleTimeout = from.Workspace.IdleTimeout
+		}
+		if from.Workspace.ProgressTimeout != "" {
+			to.Workspace.ProgressTimeout = from.Workspace.ProgressTimeout
+		}
+		if from.Workspace.IgnoredUnrecoverableEvents != nil {
+			to.Workspace.IgnoredUnrecoverableEvents = from.Workspace.IgnoredUnrecoverableEvents
+		}
+		if from.Workspace.CleanupOnStop != nil {
+			to.Workspace.CleanupOnStop = from.Workspace.CleanupOnStop
+		}
+		if from.Workspace.PodSecurityContext != nil {
+			to.Workspace.PodSecurityContext = from.Workspace.PodSecurityContext
+		}
+		if from.Workspace.DefaultStorageSize != nil {
+			if to.Workspace.DefaultStorageSize == nil {
+				to.Workspace.DefaultStorageSize = &controller.StorageSizes{}
+			}
+			if from.Workspace.DefaultStorageSize.Common != nil {
+				commonSizeCopy := from.Workspace.DefaultStorageSize.Common.DeepCopy()
+				to.Workspace.DefaultStorageSize.Common = &commonSizeCopy
+			}
+			if from.Workspace.DefaultStorageSize.PerWorkspace != nil {
+				perWorkspaceSizeCopy := from.Workspace.DefaultStorageSize.PerWorkspace.DeepCopy()
+				to.Workspace.DefaultStorageSize.PerWorkspace = &perWorkspaceSizeCopy
+			}
+		}
+		if from.Workspace.DefaultTemplate != nil {
+			templateSpecContentCopy := from.Workspace.DefaultTemplate.DeepCopy()
+			to.Workspace.DefaultTemplate = templateSpecContentCopy
+		}
+	}
+
+	if to == nil {
+		to = &controller.OperatorConfiguration{}
+	}
+	if from == nil {
+		return
+	}
+	if from.EnableExperimentalFeatures != nil {
+		to.EnableExperimentalFeatures = from.EnableExperimentalFeatures
+	}
+	if from.Routing != nil {
+		if to.Routing == nil {
+			to.Routing = &controller.RoutingConfig{}
+		}
+		if from.Routing.DefaultRoutingClass != "" {
+			to.Routing.DefaultRoutingClass = from.Routing.DefaultRoutingClass
+		}
+		if from.Routing.ClusterHostSuffix != "" {
+			to.Routing.ClusterHostSuffix = from.Routing.ClusterHostSuffix
+		}
+		if from.Routing.ProxyConfig != nil {
+			if to.Routing.ProxyConfig == nil {
+				to.Routing.ProxyConfig = &controller.Proxy{}
+			}
+			to.Routing.ProxyConfig = proxy.MergeProxyConfigs(from.Routing.ProxyConfig, defaultConfig.Routing.ProxyConfig)
+		}
+	}
+	if from.Workspace != nil {
+		if to.Workspace == nil {
+			to.Workspace = &controller.WorkspaceConfig{}
+		}
+		if from.Workspace.StorageClassName != nil {
+			to.Workspace.StorageClassName = from.Workspace.StorageClassName
+		}
+		if from.Workspace.PVCName != "" {
+			to.Workspace.PVCName = from.Workspace.PVCName
+		}
+		if from.Workspace.ImagePullPolicy != "" {
+			to.Workspace.ImagePullPolicy = from.Workspace.ImagePullPolicy
+		}
+		if from.Workspace.IdleTimeout != "" {
+			to.Workspace.IdleTimeout = from.Workspace.IdleTimeout
+		}
+		if from.Workspace.ProgressTimeout != "" {
+			to.Workspace.ProgressTimeout = from.Workspace.ProgressTimeout
+		}
+		if from.Workspace.IgnoredUnrecoverableEvents != nil {
+			to.Workspace.IgnoredUnrecoverableEvents = from.Workspace.IgnoredUnrecoverableEvents
+		}
+		if from.Workspace.CleanupOnStop != nil {
+			to.Workspace.CleanupOnStop = from.Workspace.CleanupOnStop
+		}
+		if from.Workspace.PodSecurityContext != nil {
+			to.Workspace.PodSecurityContext = from.Workspace.PodSecurityContext
+		}
+		if from.Workspace.DefaultStorageSize != nil {
+			if to.Workspace.DefaultStorageSize == nil {
+				to.Workspace.DefaultStorageSize = &controller.StorageSizes{}
+			}
+			if from.Workspace.DefaultStorageSize.Common != nil {
+				commonSizeCopy := from.Workspace.DefaultStorageSize.Common.DeepCopy()
+				to.Workspace.DefaultStorageSize.Common = &commonSizeCopy
+			}
+			if from.Workspace.DefaultStorageSize.PerWorkspace != nil {
+				perWorkspaceSizeCopy := from.Workspace.DefaultStorageSize.PerWorkspace.DeepCopy()
+				to.Workspace.DefaultStorageSize.PerWorkspace = &perWorkspaceSizeCopy
+			}
+		}
+		if from.Workspace.DefaultTemplate != nil {
+			templateSpecContentCopy := from.Workspace.DefaultTemplate.DeepCopy()
+			to.Workspace.DefaultTemplate = templateSpecContentCopy
+		}
+	}
+
+	if to == nil {
+		to = &controller.OperatorConfiguration{}
+	}
+	if from == nil {
+		return
+	}
+	if from.EnableExperimentalFeatures != nil {
+		to.EnableExperimentalFeatures = from.EnableExperimentalFeatures
+	}
+	if from.Routing != nil {
+		if to.Routing == nil {
+			to.Routing = &controller.RoutingConfig{}
+		}
+		if from.Routing.DefaultRoutingClass != "" {
+			to.Routing.DefaultRoutingClass = from.Routing.DefaultRoutingClass
+		}
+		if from.Routing.ClusterHostSuffix != "" {
+			to.Routing.ClusterHostSuffix = from.Routing.ClusterHostSuffix
+		}
+		if from.Routing.ProxyConfig != nil {
+			if to.Routing.ProxyConfig == nil {
+				to.Routing.ProxyConfig = &controller.Proxy{}
+			}
+			to.Routing.ProxyConfig = proxy.MergeProxyConfigs(from.Routing.ProxyConfig, defaultConfig.Routing.ProxyConfig)
+		}
+	}
+	if from.Workspace != nil {
+		if to.Workspace == nil {
+			to.Workspace = &controller.WorkspaceConfig{}
+		}
+		if from.Workspace.StorageClassName != nil {
+			to.Workspace.StorageClassName = from.Workspace.StorageClassName
+		}
+		if from.Workspace.PVCName != "" {
+			to.Workspace.PVCName = from.Workspace.PVCName
+		}
+		if from.Workspace.ImagePullPolicy != "" {
+			to.Workspace.ImagePullPolicy = from.Workspace.ImagePullPolicy
+		}
+		if from.Workspace.IdleTimeout != "" {
+			to.Workspace.IdleTimeout = from.Workspace.IdleTimeout
+		}
+		if from.Workspace.ProgressTimeout != "" {
+			to.Workspace.ProgressTimeout = from.Workspace.ProgressTimeout
+		}
+		if from.Workspace.IgnoredUnrecoverableEvents != nil {
+			to.Workspace.IgnoredUnrecoverableEvents = from.Workspace.IgnoredUnrecoverableEvents
+		}
+		if from.Workspace.CleanupOnStop != nil {
+			to.Workspace.CleanupOnStop = from.Workspace.CleanupOnStop
+		}
+		if from.Workspace.PodSecurityContext != nil {
+			to.Workspace.PodSecurityContext = from.Workspace.PodSecurityContext
+		}
+		if from.Workspace.DefaultStorageSize != nil {
+			if to.Workspace.DefaultStorageSize == nil {
+				to.Workspace.DefaultStorageSize = &controller.StorageSizes{}
+			}
+			if from.Workspace.DefaultStorageSize.Common != nil {
+				commonSizeCopy := from.Workspace.DefaultStorageSize.Common.DeepCopy()
+				to.Workspace.DefaultStorageSize.Common = &commonSizeCopy
+			}
+			if from.Workspace.DefaultStorageSize.PerWorkspace != nil {
+				perWorkspaceSizeCopy := from.Workspace.DefaultStorageSize.PerWorkspace.DeepCopy()
+				to.Workspace.DefaultStorageSize.PerWorkspace = &perWorkspaceSizeCopy
+			}
+		}
+		if from.Workspace.DefaultTemplate != nil {
+			templateSpecContentCopy := from.Workspace.DefaultTemplate.DeepCopy()
+			to.Workspace.DefaultTemplate = templateSpecContentCopy
+		}
+	}
+
+	if to == nil {
+		to = &controller.OperatorConfiguration{}
+	}
+	if from == nil {
+		return
+	}
+	if from.EnableExperimentalFeatures != nil {
+		to.EnableExperimentalFeatures = from.EnableExperimentalFeatures
+	}
+	if from.Routing != nil {
+		if to.Routing == nil {
+			to.Routing = &controller.RoutingConfig{}
+		}
+		if from.Routing.DefaultRoutingClass != "" {
+			to.Routing.DefaultRoutingClass = from.Routing.DefaultRoutingClass
+		}
+		if from.Routing.ClusterHostSuffix != "" {
+			to.Routing.ClusterHostSuffix = from.Routing.ClusterHostSuffix
+		}
+		if from.Routing.ProxyConfig != nil {
+			if to.Routing.ProxyConfig == nil {
+				to.Routing.ProxyConfig = &controller.Proxy{}
+			}
+			to.Routing.ProxyConfig = proxy.MergeProxyConfigs(from.Routing.ProxyConfig, defaultConfig.Routing.ProxyConfig)
+		}
+	}
+	if from.Workspace != nil {
+		if to.Workspace == nil {
+			to.Workspace = &controller.WorkspaceConfig{}
+		}
+		if from.Workspace.StorageClassName != nil {
+			to.Workspace.StorageClassName = from.Workspace.StorageClassName
+		}
+		if from.Workspace.PVCName != "" {
+			to.Workspace.PVCName = from.Workspace.PVCName
+		}
+		if from.Workspace.ImagePullPolicy != "" {
+			to.Workspace.ImagePullPolicy = from.Workspace.ImagePullPolicy
+		}
+		if from.Workspace.IdleTimeout != "" {
+			to.Workspace.IdleTimeout = from.Workspace.IdleTimeout
+		}
+		if from.Workspace.ProgressTimeout != "" {
+			to.Workspace.ProgressTimeout = from.Workspace.ProgressTimeout
+		}
+		if from.Workspace.IgnoredUnrecoverableEvents != nil {
+			to.Workspace.IgnoredUnrecoverableEvents = from.Workspace.IgnoredUnrecoverableEvents
+		}
+		if from.Workspace.CleanupOnStop != nil {
+			to.Workspace.CleanupOnStop = from.Workspace.CleanupOnStop
+		}
+		if from.Workspace.PodSecurityContext != nil {
+			to.Workspace.PodSecurityContext = from.Workspace.PodSecurityContext
+		}
+		if from.Workspace.DefaultStorageSize != nil {
+			if to.Workspace.DefaultStorageSize == nil {
+				to.Workspace.DefaultStorageSize = &controller.StorageSizes{}
+			}
+			if from.Workspace.DefaultStorageSize.Common != nil {
+				commonSizeCopy := from.Workspace.DefaultStorageSize.Common.DeepCopy()
+				to.Workspace.DefaultStorageSize.Common = &commonSizeCopy
+			}
+			if from.Workspace.DefaultStorageSize.PerWorkspace != nil {
+				perWorkspaceSizeCopy := from.Workspace.DefaultStorageSize.PerWorkspace.DeepCopy()
+				to.Workspace.DefaultStorageSize.PerWorkspace = &perWorkspaceSizeCopy
+			}
+		}
+		if from.Workspace.DefaultTemplate != nil {
+			templateSpecContentCopy := from.Workspace.DefaultTemplate.DeepCopy()
+			to.Workspace.DefaultTemplate = templateSpecContentCopy
+		}
+	}
+
+	if to == nil {
+		to = &controller.OperatorConfiguration{}
+	}
+	if from == nil {
+		return
+	}
+	if from.EnableExperimentalFeatures != nil {
+		to.EnableExperimentalFeatures = from.EnableExperimentalFeatures
+	}
+	if from.Routing != nil {
+		if to.Routing == nil {
+			to.Routing = &controller.RoutingConfig{}
+		}
+		if from.Routing.DefaultRoutingClass != "" {
+			to.Routing.DefaultRoutingClass = from.Routing.DefaultRoutingClass
+		}
+		if from.Routing.ClusterHostSuffix != "" {
+			to.Routing.ClusterHostSuffix = from.Routing.ClusterHostSuffix
+		}
+		if from.Routing.ProxyConfig != nil {
+			if to.Routing.ProxyConfig == nil {
+				to.Routing.ProxyConfig = &controller.Proxy{}
+			}
+			to.Routing.ProxyConfig = proxy.MergeProxyConfigs(from.Routing.ProxyConfig, defaultConfig.Routing.ProxyConfig)
+		}
+	}
+	if from.Workspace != nil {
+		if to.Workspace == nil {
+			to.Workspace = &controller.WorkspaceConfig{}
+		}
+		if from.Workspace.StorageClassName != nil {
+			to.Workspace.StorageClassName = from.Workspace.StorageClassName
+		}
+		if from.Workspace.PVCName != "" {
+			to.Workspace.PVCName = from.Workspace.PVCName
+		}
+		if from.Workspace.ImagePullPolicy != "" {
+			to.Workspace.ImagePullPolicy = from.Workspace.ImagePullPolicy
+		}
+		if from.Workspace.IdleTimeout != "" {
+			to.Workspace.IdleTimeout = from.Workspace.IdleTimeout
+		}
+		if from.Workspace.ProgressTimeout != "" {
+			to.Workspace.ProgressTimeout = from.Workspace.ProgressTimeout
+		}
+		if from.Workspace.IgnoredUnrecoverableEvents != nil {
+			to.Workspace.IgnoredUnrecoverableEvents = from.Workspace.IgnoredUnrecoverableEvents
+		}
+		if from.Workspace.CleanupOnStop != nil {
+			to.Workspace.CleanupOnStop = from.Workspace.CleanupOnStop
+		}
+		if from.Workspace.PodSecurityContext != nil {
+			to.Workspace.PodSecurityContext = from.Workspace.PodSecurityContext
+		}
+		if from.Workspace.DefaultStorageSize != nil {
+			if to.Workspace.DefaultStorageSize == nil {
+				to.Workspace.DefaultStorageSize = &controller.StorageSizes{}
+			}
+			if from.Workspace.DefaultStorageSize.Common != nil {
+				commonSizeCopy := from.Workspace.DefaultStorageSize.Common.DeepCopy()
+				to.Workspace.DefaultStorageSize.Common = &commonSizeCopy
+			}
+			if from.Workspace.DefaultStorageSize.PerWorkspace != nil {
+				perWorkspaceSizeCopy := from.Workspace.DefaultStorageSize.PerWorkspace.DeepCopy()
+				to.Workspace.DefaultStorageSize.PerWorkspace = &perWorkspaceSizeCopy
+			}
+		}
+		if from.Workspace.DefaultTemplate != nil {
+			templateSpecContentCopy := from.Workspace.DefaultTemplate.DeepCopy()
+			to.Workspace.DefaultTemplate = templateSpecContentCopy
+		}
+	}
+
+	if to == nil {
+		to = &controller.OperatorConfiguration{}
+	}
+	if from == nil {
+		return
+	}
+	if from.EnableExperimentalFeatures != nil {
+		to.EnableExperimentalFeatures = from.EnableExperimentalFeatures
+	}
+	if from.Routing != nil {
+		if to.Routing == nil {
+			to.Routing = &controller.RoutingConfig{}
+		}
+		if from.Routing.DefaultRoutingClass != "" {
+			to.Routing.DefaultRoutingClass = from.Routing.DefaultRoutingClass
+		}
+		if from.Routing.ClusterHostSuffix != "" {
+			to.Routing.ClusterHostSuffix = from.Routing.ClusterHostSuffix
+		}
+		if from.Routing.ProxyConfig != nil {
+			if to.Routing.ProxyConfig == nil {
+				to.Routing.ProxyConfig = &controller.Proxy{}
+			}
+			to.Routing.ProxyConfig = proxy.MergeProxyConfigs(from.Routing.ProxyConfig, defaultConfig.Routing.ProxyConfig)
+		}
+	}
+	if from.Workspace != nil {
+		if to.Workspace == nil {
+			to.Workspace = &controller.WorkspaceConfig{}
+		}
+		if from.Workspace.StorageClassName != nil {
+			to.Workspace.StorageClassName = from.Workspace.StorageClassName
+		}
+		if from.Workspace.PVCName != "" {
+			to.Workspace.PVCName = from.Workspace.PVCName
+		}
+		if from.Workspace.ImagePullPolicy != "" {
+			to.Workspace.ImagePullPolicy = from.Workspace.ImagePullPolicy
+		}
+		if from.Workspace.IdleTimeout != "" {
+			to.Workspace.IdleTimeout = from.Workspace.IdleTimeout
+		}
+		if from.Workspace.ProgressTimeout != "" {
+			to.Workspace.ProgressTimeout = from.Workspace.ProgressTimeout
+		}
+		if from.Workspace.IgnoredUnrecoverableEvents != nil {
+			to.Workspace.IgnoredUnrecoverableEvents = from.Workspace.IgnoredUnrecoverableEvents
+		}
+		if from.Workspace.CleanupOnStop != nil {
+			to.Workspace.CleanupOnStop = from.Workspace.CleanupOnStop
+		}
+		if from.Workspace.PodSecurityContext != nil {
+			to.Workspace.PodSecurityContext = from.Workspace.PodSecurityContext
+		}
+		if from.Workspace.DefaultStorageSize != nil {
+			if to.Workspace.DefaultStorageSize == nil {
+				to.Workspace.DefaultStorageSize = &controller.StorageSizes{}
+			}
+			if from.Workspace.DefaultStorageSize.Common != nil {
+				commonSizeCopy := from.Workspace.DefaultStorageSize.Common.DeepCopy()
+				to.Workspace.DefaultStorageSize.Common = &commonSizeCopy
+			}
+			if from.Workspace.DefaultStorageSize.PerWorkspace != nil {
+				perWorkspaceSizeCopy := from.Workspace.DefaultStorageSize.PerWorkspace.DeepCopy()
+				to.Workspace.DefaultStorageSize.PerWorkspace = &perWorkspaceSizeCopy
+			}
+		}
+		if from.Workspace.DefaultTemplate != nil {
+			templateSpecContentCopy := from.Workspace.DefaultTemplate.DeepCopy()
+			to.Workspace.DefaultTemplate = templateSpecContentCopy
+		}
+	}
+
+	if to == nil {
+		to = &controller.OperatorConfiguration{}
+	}
+	if from == nil {
+		return
+	}
+	if from.EnableExperimentalFeatures != nil {
+		to.EnableExperimentalFeatures = from.EnableExperimentalFeatures
+	}
+	if from.Routing != nil {
+		if to.Routing == nil {
+			to.Routing = &controller.RoutingConfig{}
+		}
+		if from.Routing.DefaultRoutingClass != "" {
+			to.Routing.DefaultRoutingClass = from.Routing.DefaultRoutingClass
+		}
+		if from.Routing.ClusterHostSuffix != "" {
+			to.Routing.ClusterHostSuffix = from.Routing.ClusterHostSuffix
+		}
+		if from.Routing.ProxyConfig != nil {
+			if to.Routing.ProxyConfig == nil {
+				to.Routing.ProxyConfig = &controller.Proxy{}
+			}
+			to.Routing.ProxyConfig = proxy.MergeProxyConfigs(from.Routing.ProxyConfig, defaultConfig.Routing.ProxyConfig)
+		}
+	}
+	if from.Workspace != nil {
+		if to.Workspace == nil {
+			to.Workspace = &controller.WorkspaceConfig{}
+		}
+		if from.Workspace.StorageClassName != nil {
+			to.Workspace.StorageClassName = from.Workspace.StorageClassName
+		}
+		if from.Workspace.PVCName != "" {
+			to.Workspace.PVCName = from.Workspace.PVCName
+		}
+		if from.Workspace.ImagePullPolicy != "" {
+			to.Workspace.ImagePullPolicy = from.Workspace.ImagePullPolicy
+		}
+		if from.Workspace.IdleTimeout != "" {
+			to.Workspace.IdleTimeout = from.Workspace.IdleTimeout
+		}
+		if from.Workspace.ProgressTimeout != "" {
+			to.Workspace.ProgressTimeout = from.Workspace.ProgressTimeout
+		}
+		if from.Workspace.IgnoredUnrecoverableEvents != nil {
+			to.Workspace.IgnoredUnrecoverableEvents = from.Workspace.IgnoredUnrecoverableEvents
+		}
+		if from.Workspace.CleanupOnStop != nil {
+			to.Workspace.CleanupOnStop = from.Workspace.CleanupOnStop
+		}
+		if from.Workspace.PodSecurityContext != nil {
+			to.Workspace.PodSecurityContext = from.Workspace.PodSecurityContext
+		}
+		if from.Workspace.DefaultStorageSize != nil {
+			if to.Workspace.DefaultStorageSize == nil {
+				to.Workspace.DefaultStorageSize = &controller.StorageSizes{}
+			}
+			if from.Workspace.DefaultStorageSize.Common != nil {
+				commonSizeCopy := from.Workspace.DefaultStorageSize.Common.DeepCopy()
+				to.Workspace.DefaultStorageSize.Common = &commonSizeCopy
+			}
+			if from.Workspace.DefaultStorageSize.PerWorkspace != nil {
+				perWorkspaceSizeCopy := from.Workspace.DefaultStorageSize.PerWorkspace.DeepCopy()
+				to.Workspace.DefaultStorageSize.PerWorkspace = &perWorkspaceSizeCopy
+			}
+		}
+		if from.Workspace.DefaultTemplate != nil {
+			templateSpecContentCopy := from.Workspace.DefaultTemplate.DeepCopy()
+			to.Workspace.DefaultTemplate = templateSpecContentCopy
+		}
+	}
+
+	if to == nil {
+		to = &controller.OperatorConfiguration{}
+	}
+	if from == nil {
+		return
+	}
+	if from.EnableExperimentalFeatures != nil {
+		to.EnableExperimentalFeatures = from.EnableExperimentalFeatures
+	}
+	if from.Routing != nil {
+		if to.Routing == nil {
+			to.Routing = &controller.RoutingConfig{}
+		}
+		if from.Routing.DefaultRoutingClass != "" {
+			to.Routing.DefaultRoutingClass = from.Routing.DefaultRoutingClass
+		}
+		if from.Routing.ClusterHostSuffix != "" {
+			to.Routing.ClusterHostSuffix = from.Routing.ClusterHostSuffix
+		}
+		if from.Routing.ProxyConfig != nil {
+			if to.Routing.ProxyConfig == nil {
+				to.Routing.ProxyConfig = &controller.Proxy{}
+			}
+			to.Routing.ProxyConfig = proxy.MergeProxyConfigs(from.Routing.ProxyConfig, defaultConfig.Routing.ProxyConfig)
+		}
+	}
+	if from.Workspace != nil {
+		if to.Workspace == nil {
+			to.Workspace = &controller.WorkspaceConfig{}
+		}
+		if from.Workspace.StorageClassName != nil {
+			to.Workspace.StorageClassName = from.Workspace.StorageClassName
+		}
+		if from.Workspace.PVCName != "" {
+			to.Workspace.PVCName = from.Workspace.PVCName
+		}
+		if from.Workspace.ImagePullPolicy != "" {
+			to.Workspace.ImagePullPolicy = from.Workspace.ImagePullPolicy
+		}
+		if from.Workspace.IdleTimeout != "" {
+			to.Workspace.IdleTimeout = from.Workspace.IdleTimeout
+		}
+		if from.Workspace.ProgressTimeout != "" {
+			to.Workspace.ProgressTimeout = from.Workspace.ProgressTimeout
+		}
+		if from.Workspace.IgnoredUnrecoverableEvents != nil {
+			to.Workspace.IgnoredUnrecoverableEvents = from.Workspace.IgnoredUnrecoverableEvents
+		}
+		if from.Workspace.CleanupOnStop != nil {
+			to.Workspace.CleanupOnStop = from.Workspace.CleanupOnStop
+		}
+		if from.Workspace.PodSecurityContext != nil {
+			to.Workspace.PodSecurityContext = from.Workspace.PodSecurityContext
+		}
+		if from.Workspace.DefaultStorageSize != nil {
+			if to.Workspace.DefaultStorageSize == nil {
+				to.Workspace.DefaultStorageSize = &controller.StorageSizes{}
+			}
+			if from.Workspace.DefaultStorageSize.Common != nil {
+				commonSizeCopy := from.Workspace.DefaultStorageSize.Common.DeepCopy()
+				to.Workspace.DefaultStorageSize.Common = &commonSizeCopy
+			}
+			if from.Workspace.DefaultStorageSize.PerWorkspace != nil {
+				perWorkspaceSizeCopy := from.Workspace.DefaultStorageSize.PerWorkspace.DeepCopy()
+				to.Workspace.DefaultStorageSize.PerWorkspace = &perWorkspaceSizeCopy
+			}
+		}
+		if from.Workspace.DefaultTemplate != nil {
+			templateSpecContentCopy := from.Workspace.DefaultTemplate.DeepCopy()
+			to.Workspace.DefaultTemplate = templateSpecContentCopy
+		}
+	}
+
+	if to == nil {
+		to = &controller.OperatorConfiguration{}
+	}
+	if from == nil {
+		return
+	}
+	if from.EnableExperimentalFeatures != nil {
+		to.EnableExperimentalFeatures = from.EnableExperimentalFeatures
+	}
+	if from.Routing != nil {
+		if to.Routing == nil {
+			to.Routing = &controller.RoutingConfig{}
+		}
+		if from.Routing.DefaultRoutingClass != "" {
+			to.Routing.DefaultRoutingClass = from.Routing.DefaultRoutingClass
+		}
+		if from.Routing.ClusterHostSuffix != "" {
+			to.Routing.ClusterHostSuffix = from.Routing.ClusterHostSuffix
+		}
+		if from.Routing.ProxyConfig != nil {
+			if to.Routing.ProxyConfig == nil {
+				to.Routing.ProxyConfig = &controller.Proxy{}
+			}
+			to.Routing.ProxyConfig = proxy.MergeProxyConfigs(from.Routing.ProxyConfig, defaultConfig.Routing.ProxyConfig)
+		}
+	}
+	if from.Workspace != nil {
+		if to.Workspace == nil {
+			to.Workspace = &controller.WorkspaceConfig{}
+		}
+		if from.Workspace.StorageClassName != nil {
+			to.Workspace.StorageClassName = from.Workspace.StorageClassName
+		}
+		if from.Workspace.PVCName != "" {
+			to.Workspace.PVCName = from.Workspace.PVCName
+		}
+		if from.Workspace.ImagePullPolicy != "" {
+			to.Workspace.ImagePullPolicy = from.Workspace.ImagePullPolicy
+		}
+		if from.Workspace.IdleTimeout != "" {
+			to.Workspace.IdleTimeout = from.Workspace.IdleTimeout
+		}
+		if from.Workspace.ProgressTimeout != "" {
+			to.Workspace.ProgressTimeout = from.Workspace.ProgressTimeout
+		}
+		if from.Workspace.IgnoredUnrecoverableEvents != nil {
+			to.Workspace.IgnoredUnrecoverableEvents = from.Workspace.IgnoredUnrecoverableEvents
+		}
+		if from.Workspace.CleanupOnStop != nil {
+			to.Workspace.CleanupOnStop = from.Workspace.CleanupOnStop
+		}
+		if from.Workspace.PodSecurityContext != nil {
+			to.Workspace.PodSecurityContext = from.Workspace.PodSecurityContext
+		}
+		if from.Workspace.DefaultStorageSize != nil {
+			if to.Workspace.DefaultStorageSize == nil {
+				to.Workspace.DefaultStorageSize = &controller.StorageSizes{}
+			}
+			if from.Workspace.DefaultStorageSize.Common != nil {
+				commonSizeCopy := from.Workspace.DefaultStorageSize.Common.DeepCopy()
+				to.Workspace.DefaultStorageSize.Common = &commonSizeCopy
+			}
+			if from.Workspace.DefaultStorageSize.PerWorkspace != nil {
+				perWorkspaceSizeCopy := from.Workspace.DefaultStorageSize.PerWorkspace.DeepCopy()
+				to.Workspace.DefaultStorageSize.PerWorkspace = &perWorkspaceSizeCopy
+			}
+		}
+		if from.Workspace.DefaultTemplate != nil {
+			templateSpecContentCopy := from.Workspace.DefaultTemplate.DeepCopy()
+			to.Workspace.DefaultTemplate = templateSpecContentCopy
+		}
+	}
+
+	if to == nil {
+		to = &controller.OperatorConfiguration{}
+	}
+	if from == nil {
+		return
+	}
+	if from.EnableExperimentalFeatures != nil {
+		to.EnableExperimentalFeatures = from.EnableExperimentalFeatures
+	}
+	if from.Routing != nil {
+		if to.Routing == nil {
+			to.Routing = &controller.RoutingConfig{}
+		}
+		if from.Routing.DefaultRoutingClass != "" {
+			to.Routing.DefaultRoutingClass = from.Routing.DefaultRoutingClass
+		}
+		if from.Routing.ClusterHostSuffix != "" {
+			to.Routing.ClusterHostSuffix = from.Routing.ClusterHostSuffix
+		}
+		if from.Routing.ProxyConfig != nil {
+			if to.Routing.ProxyConfig == nil {
+				to.Routing.ProxyConfig = &controller.Proxy{}
+			}
+			to.Routing.ProxyConfig = proxy.MergeProxyConfigs(from.Routing.ProxyConfig, defaultConfig.Routing.ProxyConfig)
+		}
+	}
+	if from.Workspace != nil {
+		if to.Workspace == nil {
+			to.Workspace = &controller.WorkspaceConfig{}
+		}
+		if from.Workspace.StorageClassName != nil {
+			to.Workspace.StorageClassName = from.Workspace.StorageClassName
+		}
+		if from.Workspace.PVCName != "" {
+			to.Workspace.PVCName = from.Workspace.PVCName
+		}
+		if from.Workspace.ImagePullPolicy != "" {
+			to.Workspace.ImagePullPolicy = from.Workspace.ImagePullPolicy
+		}
+		if from.Workspace.IdleTimeout != "" {
+			to.Workspace.IdleTimeout = from.Workspace.IdleTimeout
+		}
+		if from.Workspace.ProgressTimeout != "" {
+			to.Workspace.ProgressTimeout = from.Workspace.ProgressTimeout
+		}
+		if from.Workspace.IgnoredUnrecoverableEvents != nil {
+			to.Workspace.IgnoredUnrecoverableEvents = from.Workspace.IgnoredUnrecoverableEvents
+		}
+		if from.Workspace.CleanupOnStop != nil {
+			to.Workspace.CleanupOnStop = from.Workspace.CleanupOnStop
+		}
+		if from.Workspace.PodSecurityContext != nil {
+			to.Workspace.PodSecurityContext = from.Workspace.PodSecurityContext
+		}
+		if from.Workspace.DefaultStorageSize != nil {
+			if to.Workspace.DefaultStorageSize == nil {
+				to.Workspace.DefaultStorageSize = &controller.StorageSizes{}
+			}
+			if from.Workspace.DefaultStorageSize.Common != nil {
+				commonSizeCopy := from.Workspace.DefaultStorageSize.Common.DeepCopy()
+				to.Workspace.DefaultStorageSize.Common = &commonSizeCopy
+			}
+			if from.Workspace.DefaultStorageSize.PerWorkspace != nil {
+				perWorkspaceSizeCopy := from.Workspace.DefaultStorageSize.PerWorkspace.DeepCopy()
+				to.Workspace.DefaultStorageSize.PerWorkspace = &perWorkspaceSizeCopy
+			}
+		}
+		if from.Workspace.DefaultTemplate != nil {
+			templateSpecContentCopy := from.Workspace.DefaultTemplate.DeepCopy()
+			to.Workspace.DefaultTemplate = templateSpecContentCopy
+		}
+	}
+
+	if to == nil {
+		to = &controller.OperatorConfiguration{}
+	}
+	if from == nil {
+		return
+	}
+	if from.EnableExperimentalFeatures != nil {
+		to.EnableExperimentalFeatures = from.EnableExperimentalFeatures
+	}
+	if from.Routing != nil {
+		if to.Routing == nil {
+			to.Routing = &controller.RoutingConfig{}
+		}
+		if from.Routing.DefaultRoutingClass != "" {
+			to.Routing.DefaultRoutingClass = from.Routing.DefaultRoutingClass
+		}
+		if from.Routing.ClusterHostSuffix != "" {
+			to.Routing.ClusterHostSuffix = from.Routing.ClusterHostSuffix
+		}
+		if from.Routing.ProxyConfig != nil {
+			if to.Routing.ProxyConfig == nil {
+				to.Routing.ProxyConfig = &controller.Proxy{}
+			}
+			to.Routing.ProxyConfig = proxy.MergeProxyConfigs(from.Routing.ProxyConfig, defaultConfig.Routing.ProxyConfig)
+		}
+	}
+	if from.Workspace != nil {
+		if to.Workspace == nil {
+			to.Workspace = &controller.WorkspaceConfig{}
+		}
+		if from.Workspace.StorageClassName != nil {
+			to.Workspace.StorageClassName = from.Workspace.StorageClassName
+		}
+		if from.Workspace.PVCName != "" {
+			to.Workspace.PVCName = from.Workspace.PVCName
+		}
+		if from.Workspace.ImagePullPolicy != "" {
+			to.Workspace.ImagePullPolicy = from.Workspace.ImagePullPolicy
+		}
+		if from.Workspace.IdleTimeout != "" {
+			to.Workspace.IdleTimeout = from.Workspace.IdleTimeout
+		}
+		if from.Workspace.ProgressTimeout != "" {
+			to.Workspace.ProgressTimeout = from.Workspace.ProgressTimeout
+		}
+		if from.Workspace.IgnoredUnrecoverableEvents != nil {
+			to.Workspace.IgnoredUnrecoverableEvents = from.Workspace.IgnoredUnrecoverableEvents
+		}
+		if from.Workspace.CleanupOnStop != nil {
+			to.Workspace.CleanupOnStop = from.Workspace.CleanupOnStop
+		}
+		if from.Workspace.PodSecurityContext != nil {
+			to.Workspace.PodSecurityContext = from.Workspace.PodSecurityContext
+		}
+		if from.Workspace.DefaultStorageSize != nil {
+			if to.Workspace.DefaultStorageSize == nil {
+				to.Workspace.DefaultStorageSize = &controller.StorageSizes{}
+			}
+			if from.Workspace.DefaultStorageSize.Common != nil {
+				commonSizeCopy := from.Workspace.DefaultStorageSize.Common.DeepCopy()
+				to.Workspace.DefaultStorageSize.Common = &commonSizeCopy
+			}
+			if from.Workspace.DefaultStorageSize.PerWorkspace != nil {
+				perWorkspaceSizeCopy := from.Workspace.DefaultStorageSize.PerWorkspace.DeepCopy()
+				to.Workspace.DefaultStorageSize.PerWorkspace = &perWorkspaceSizeCopy
+			}
+		}
+		if from.Workspace.DefaultTemplate != nil {
+			templateSpecContentCopy := from.Workspace.DefaultTemplate.DeepCopy()
+			to.Workspace.DefaultTemplate = templateSpecContentCopy
+		}
+	}
+
+	if to == nil {
+		to = &controller.OperatorConfiguration{}
+	}
+	if from == nil {
+		return
+	}
+	if from.EnableExperimentalFeatures != nil {
+		to.EnableExperimentalFeatures = from.EnableExperimentalFeatures
+	}
+	if from.Routing != nil {
+		if to.Routing == nil {
+			to.Routing = &controller.RoutingConfig{}
+		}
+		if from.Routing.DefaultRoutingClass != "" {
+			to.Routing.DefaultRoutingClass = from.Routing.DefaultRoutingClass
+		}
+		if from.Routing.ClusterHostSuffix != "" {
+			to.Routing.ClusterHostSuffix = from.Routing.ClusterHostSuffix
+		}
+		if from.Routing.ProxyConfig != nil {
+			if to.Routing.ProxyConfig == nil {
+				to.Routing.ProxyConfig = &controller.Proxy{}
+			}
+			to.Routing.ProxyConfig = proxy.MergeProxyConfigs(from.Routing.ProxyConfig, defaultConfig.Routing.ProxyConfig)
+		}
+	}
+	if from.Workspace != nil {
+		if to.Workspace == nil {
+			to.Workspace = &controller.WorkspaceConfig{}
+		}
+		if from.Workspace.StorageClassName != nil {
+			to.Workspace.StorageClassName = from.Workspace.StorageClassName
+		}
+		if from.Workspace.PVCName != "" {
+			to.Workspace.PVCName = from.Workspace.PVCName
+		}
+		if from.Workspace.ImagePullPolicy != "" {
+			to.Workspace.ImagePullPolicy = from.Workspace.ImagePullPolicy
+		}
+		if from.Workspace.IdleTimeout != "" {
+			to.Workspace.IdleTimeout = from.Workspace.IdleTimeout
+		}
+		if from.Workspace.ProgressTimeout != "" {
+			to.Workspace.ProgressTimeout = from.Workspace.ProgressTimeout
+		}
+		if from.Workspace.IgnoredUnrecoverableEvents != nil {
+			to.Workspace.IgnoredUnrecoverableEvents = from.Workspace.IgnoredUnrecoverableEvents
+		}
+		if from.Workspace.CleanupOnStop != nil {
+			to.Workspace.CleanupOnStop = from.Workspace.CleanupOnStop
+		}
+		if from.Workspace.PodSecurityContext != nil {
+			to.Workspace.PodSecurityContext = from.Workspace.PodSecurityContext
+		}
+		if from.Workspace.DefaultStorageSize != nil {
+			if to.Workspace.DefaultStorageSize == nil {
+				to.Workspace.DefaultStorageSize = &controller.StorageSizes{}
+			}
+			if from.Workspace.DefaultStorageSize.Common != nil {
+				commonSizeCopy := from.Workspace.DefaultStorageSize.Common.DeepCopy()
+				to.Workspace.DefaultStorageSize.Common = &commonSizeCopy
+			}
+			if from.Workspace.DefaultStorageSize.PerWorkspace != nil {
+				perWorkspaceSizeCopy := from.Workspace.DefaultStorageSize.PerWorkspace.DeepCopy()
+				to.Workspace.DefaultStorageSize.PerWorkspace = &perWorkspaceSizeCopy
+			}
+		}
+		if from.Workspace.DefaultTemplate != nil {
+			templateSpecContentCopy := from.Workspace.DefaultTemplate.DeepCopy()
+			to.Workspace.DefaultTemplate = templateSpecContentCopy
+		}
+	}
+
+	if to == nil {
+		to = &controller.OperatorConfiguration{}
+	}
+	if from == nil {
+		return
+	}
+	if from.EnableExperimentalFeatures != nil {
+		to.EnableExperimentalFeatures = from.EnableExperimentalFeatures
+	}
+	if from.Routing != nil {
+		if to.Routing == nil {
+			to.Routing = &controller.RoutingConfig{}
+		}
+		if from.Routing.DefaultRoutingClass != "" {
+			to.Routing.DefaultRoutingClass = from.Routing.DefaultRoutingClass
+		}
+		if from.Routing.ClusterHostSuffix != "" {
+			to.Routing.ClusterHostSuffix = from.Routing.ClusterHostSuffix
+		}
+		if from.Routing.ProxyConfig != nil {
+			if to.Routing.ProxyConfig == nil {
+				to.Routing.ProxyConfig = &controller.Proxy{}
+			}
+			to.Routing.ProxyConfig = proxy.MergeProxyConfigs(from.Routing.ProxyConfig, defaultConfig.Routing.ProxyConfig)
+		}
+	}
+	if from.Workspace != nil {
+		if to.Workspace == nil {
+			to.Workspace = &controller.WorkspaceConfig{}
+		}
+		if from.Workspace.StorageClassName != nil {
+			to.Workspace.StorageClassName = from.Workspace.StorageClassName
+		}
+		if from.Workspace.PVCName != "" {
+			to.Workspace.PVCName = from.Workspace.PVCName
+		}
+		if from.Workspace.ImagePullPolicy != "" {
+			to.Workspace.ImagePullPolicy = from.Workspace.ImagePullPolicy
+		}
+		if from.Workspace.IdleTimeout != "" {
+			to.Workspace.IdleTimeout = from.Workspace.IdleTimeout
+		}
+		if from.Workspace.ProgressTimeout != "" {
+			to.Workspace.ProgressTimeout = from.Workspace.ProgressTimeout
+		}
+		if from.Workspace.IgnoredUnrecoverableEvents != nil {
+			to.Workspace.IgnoredUnrecoverableEvents = from.Workspace.IgnoredUnrecoverableEvents
+		}
+		if from.Workspace.CleanupOnStop != nil {
+			to.Workspace.CleanupOnStop = from.Workspace.CleanupOnStop
+		}
+		if from.Workspace.PodSecurityContext != nil {
+			to.Workspace.PodSecurityContext = from.Workspace.PodSecurityContext
+		}
+		if from.Workspace.DefaultStorageSize != nil {
+			if to.Workspace.DefaultStorageSize == nil {
+				to.Workspace.DefaultStorageSize = &controller.StorageSizes{}
+			}
+			if from.Workspace.DefaultStorageSize.Common != nil {
+				commonSizeCopy := from.Workspace.DefaultStorageSize.Common.DeepCopy()
+				to.Workspace.DefaultStorageSize.Common = &commonSizeCopy
+			}
+			if from.Workspace.DefaultStorageSize.PerWorkspace != nil {
+				perWorkspaceSizeCopy := from.Workspace.DefaultStorageSize.PerWorkspace.DeepCopy()
+				to.Workspace.DefaultStorageSize.PerWorkspace = &perWorkspaceSizeCopy
+			}
+		}
+		if from.Workspace.DefaultTemplate != nil {
+			templateSpecContentCopy := from.Workspace.DefaultTemplate.DeepCopy()
+			to.Workspace.DefaultTemplate = templateSpecContentCopy
+		}
+	}
 }
 
 func testedFunction() int {
