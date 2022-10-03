@@ -397,6 +397,7 @@ func unTestedFunction(from, to *controller.OperatorConfiguration) {
 			to.Routing.ProxyConfig = proxy.MergeProxyConfigs(from.Routing.ProxyConfig, defaultConfig.Routing.ProxyConfig)
 		}
 	}
+
 	if from.Workspace != nil {
 		if to.Workspace == nil {
 			to.Workspace = &controller.WorkspaceConfig{}
