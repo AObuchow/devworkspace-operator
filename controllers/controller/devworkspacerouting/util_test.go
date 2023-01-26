@@ -118,7 +118,8 @@ func deleteDevWorkspaceRouting(name string) {
 			}
 			return err
 		}
-		dwr.Finalizers = nil
+		// TODO: Removing finalizers will prevent services from being deleted?
+		//dwr.Finalizers = nil
 		return k8sClient.Update(ctx, dwr)
 	}, 10*time.Second, 250*time.Millisecond).Should(Succeed(), "Could not remove finalizers from DevWorkspaceRouting")
 

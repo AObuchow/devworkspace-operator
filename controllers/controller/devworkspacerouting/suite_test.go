@@ -16,6 +16,7 @@ package devworkspacerouting_test
 import (
 	"context"
 	"fmt"
+	"go/build"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -27,6 +28,11 @@ import (
 	"github.com/devfile/devworkspace-operator/controllers/controller/devworkspacerouting"
 	"github.com/devfile/devworkspace-operator/controllers/controller/devworkspacerouting/internal/testutil"
 	"github.com/devfile/devworkspace-operator/controllers/controller/devworkspacerouting/solvers"
+	configv1 "github.com/openshift/api/config/v1"
+	oauthv1 "github.com/openshift/api/oauth/v1"
+	routev1 "github.com/openshift/api/route/v1"
+	securityv1 "github.com/openshift/api/security/v1"
+	templatev1 "github.com/openshift/api/template/v1"
 
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,6 +57,9 @@ const (
 	testNamespace           = "devworkspace-test"
 	devWorkspaceName        = "test-devworkspace" // TODO: Remove
 	devWorkspaceRoutingName = "test-devworkspacerouting"
+	workspaceID             = "test-id"
+	targetPort              = 7777
+	endPointName            = "test-endpoint"
 )
 
 var (
@@ -87,7 +96,10 @@ var _ = BeforeSuite(func() {
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "deploy", "templates", "crd", "bases")},
+		CRDDirectoryPaths: []string{
+			filepath.Join("..", "..", "..", "deploy", "templates", "crd", "bases"),
+			filepath.Join(build.Default.GOPATH, "pkg", "mod", "github.com", "openshift", "api@v0.0.0-20220729142910-83d1191dd9fc", "route", "v1", "route.crd.yaml"),
+		},
 		ErrorIfCRDPathMissing: true,
 		BinaryAssetsDirectory: filepath.Join("..", "..", "..", "bin", "k8s", "1.24.2-linux-amd64"),
 	}
@@ -96,7 +108,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	infrastructure.InitializeForTesting(infrastructure.Kubernetes)
+	infrastructure.InitializeForTesting(infrastructure.OpenShiftv4)
 	config.SetGlobalConfigForTesting(testControllerCfg)
 
 	err = controllerv1alpha1.AddToScheme(scheme.Scheme)
@@ -104,6 +116,22 @@ var _ = BeforeSuite(func() {
 	err = dwv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 	err = dwv2.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Openshift schemas
+
+	err = routev1.Install(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+	err = templatev1.Install(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+	err = oauthv1.Install(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+	// Enable controller to manage SCCs in OpenShift; permissions to do this are not requested
+	// by default and must be added by a cluster-admin.
+	err = securityv1.Install(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+	// Enable controller to read cluster-wide proxy on OpenShift
+	err = configv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
