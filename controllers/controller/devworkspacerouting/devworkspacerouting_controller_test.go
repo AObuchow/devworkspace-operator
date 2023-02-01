@@ -13,6 +13,7 @@ import (
 	. "github.com/onsi/gomega"
 	routeV1 "github.com/openshift/api/route/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
@@ -113,6 +114,38 @@ func getExistingDevWorkspaceRouting(name string) *controllerv1alpha1.DevWorkspac
 	return dwr
 }
 
+func deleteService(workspaceID string, namespace string) {
+	createdService := &corev1.Service{}
+	serviceNamespacedName := namespacedName(common.ServiceName(workspaceID), namespace)
+	Eventually(func() bool {
+		err := k8sClient.Get(ctx, serviceNamespacedName, createdService)
+		return err == nil
+	}, timeout, interval).Should(BeTrue(), "Service should exist in cluster")
+	deleteObject(createdService)
+}
+
+func deleteRoute(workspaceID string, namespace string) {
+	createdRoute := routeV1.Route{}
+	// TODO: Add endpointName as a function parameter?
+	routeNamespacedName := namespacedName(common.RouteName(workspaceID, endPointName), namespace)
+	Eventually(func() bool {
+		err := k8sClient.Get(ctx, routeNamespacedName, &createdRoute)
+		return err == nil
+	}, timeout, interval).Should(BeTrue(), "Route should exist in cluster")
+	deleteObject(&createdRoute)
+}
+
+func deleteIngress(workspaceID string, namespace string) {
+	createdIngress := networkingv1.Ingress{}
+	// TODO: Add endpointName as a function parameter?
+	ingressNamespacedName := namespacedName(common.RouteName(workspaceID, endPointName), namespace)
+	Eventually(func() bool {
+		err := k8sClient.Get(ctx, ingressNamespacedName, &createdIngress)
+		return err == nil
+	}, timeout, interval).Should(BeTrue(), "Ingress should exist in cluster")
+	deleteObject(&createdIngress)
+}
+
 func cleanup() {
 	deleteDevWorkspaceRouting(devWorkspaceRoutingName)
 
@@ -146,6 +179,9 @@ func cleanup() {
 }
 
 var _ = Describe("DevWorkspaceRouting Controller", func() {
+	AfterEach(func() {
+		infrastructure.InitializeForTesting(infrastructure.Kubernetes)
+	})
 	Context("Basic DevWorkspaceRouting Tests", func() {
 		It("Gets Preparing status", func() {
 			By("Creating a new DevWorkspaceRouting object")
@@ -170,8 +206,37 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 
 		})
 
-		It("Gets Ready Status", func() {
+		It("Gets Ready Status on OpenShift", func() {
 			By("Creating a new DevWorkspaceRouting object")
+			infrastructure.InitializeForTesting(infrastructure.OpenShiftv4)
+
+			dwrNamespacedName := namespacedName(devWorkspaceRoutingName, testNamespace)
+			createdDWR := createDWR(workspaceID, devWorkspaceRoutingName)
+			defer deleteDevWorkspaceRouting(devWorkspaceRoutingName)
+
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, dwrNamespacedName, createdDWR)
+				return err == nil
+			}, timeout, interval).Should(BeTrue(), "DevWorkspaceRouting should exist in cluster")
+
+			By("Checking DevWorkspaceRouting Status is updated to Ready")
+			Eventually(func() (phase controllerv1alpha1.DevWorkspaceRoutingPhase, err error) {
+				if err := k8sClient.Get(ctx, dwrNamespacedName, createdDWR); err != nil {
+					return "", err
+				}
+				return createdDWR.Status.Phase, nil
+			}, timeout, interval).Should(Equal(controllerv1alpha1.RoutingReady), "DevWorkspaceRouting should have Ready phase")
+
+			Expect(createdDWR.Status.Message).ShouldNot(BeNil(), "Status message should be set for preparing DevWorkspaceRoutings")
+
+			deleteDevWorkspaceRouting(devWorkspaceRoutingName)
+			deleteService(workspaceID, testNamespace)
+			deleteRoute(workspaceID, testNamespace)
+		})
+
+		It("Gets Ready Status on Kubernetes", func() {
+			By("Creating a new DevWorkspaceRouting object")
+			infrastructure.InitializeForTesting(infrastructure.Kubernetes)
 
 			dwrNamespacedName := namespacedName(devWorkspaceRoutingName, testNamespace)
 			createdDWR := createDWR(workspaceID, devWorkspaceRoutingName)
@@ -198,50 +263,27 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 
 			// TODO: Add an endpoint that isin't controllerv1alpha1.PublicEndpointExposure to test no ingress is made for it
 
-			// TODO: Check routes (maybe not cause not openshift?)
 			// TODO: Check exposed endpoints
 			// TODO: Check finalizers
 
 			// TODO: Failure cases
-			cleanup()
-
+			deleteDevWorkspaceRouting(devWorkspaceRoutingName)
+			deleteService(workspaceID, testNamespace)
+			deleteIngress(workspaceID, testNamespace)
 		})
-
 	})
 
-	Context("DevWorkspaceRouting Objects creation", func() {
+	Context("Kubernetes - DevWorkspaceRouting Objects creation", func() {
 
 		BeforeEach(func() {
+			infrastructure.InitializeForTesting(infrastructure.Kubernetes)
 			createDWR(workspaceID, devWorkspaceRoutingName)
 		})
 
 		AfterEach(func() {
 			deleteDevWorkspaceRouting(devWorkspaceRoutingName)
-
-			createdService := &corev1.Service{}
-			serviceNamespacedName := namespacedName(common.ServiceName(workspaceID), testNamespace)
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, serviceNamespacedName, createdService)
-				return err == nil
-			}, timeout, interval).Should(BeTrue(), "Service should exist in cluster")
-
-			/* 			createdIngress := networkingv1.Ingress{}
-			   			ingressNamespacedName := namespacedName(common.RouteName(workspaceID, endPointName), testNamespace)
-			   			Eventually(func() bool {
-			   				err := k8sClient.Get(ctx, ingressNamespacedName, &createdIngress)
-			   				return err == nil
-			   			}, timeout, interval).Should(BeTrue(), "Ingress should exist in cluster") */
-
-			createdRoute := routeV1.Route{}
-			routeNamespacedName := namespacedName(common.RouteName(workspaceID, endPointName), testNamespace)
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, routeNamespacedName, &createdRoute)
-				return err == nil
-			}, timeout, interval).Should(BeTrue(), "Route should exist in cluster")
-
-			deleteObject(createdService)
-			//deleteObject(&createdIngress)
-			deleteObject(&createdRoute)
+			deleteService(workspaceID, testNamespace)
+			deleteIngress(workspaceID, testNamespace)
 		})
 		It("Creates service", func() {
 			createdDWR := getExistingDevWorkspaceRouting(devWorkspaceRoutingName)
@@ -274,10 +316,9 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 			})
 
 			Expect(createdService.Spec.Ports).Should(Equal(expectedServicePorts), "Service should contain expected ports")
-
 		})
 
-		/* 		It("Creates ingress", func() {
+		It("Creates ingress", func() {
 			createdDWR := getExistingDevWorkspaceRouting(devWorkspaceRoutingName)
 
 			// TODO: Factor out labels?
@@ -309,11 +350,56 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 			Expect(createdIngress.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].Backend.Service.Name).Should(Equal(common.ServiceName(workspaceID)), "Incorrect ingress backend service name")
 			Expect(createdIngress.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].Backend.Service.Port).Should(Equal(networkingv1.ServiceBackendPort{Number: int32(targetPort)}), "Incorrect ingress backend service port")
 
-		}) */
+		})
+
+	})
+
+	Context("OpenShift - DevWorkspaceRouting Objects creation", func() {
+
+		BeforeEach(func() {
+			infrastructure.InitializeForTesting(infrastructure.OpenShiftv4)
+			createDWR(workspaceID, devWorkspaceRoutingName)
+		})
+
+		AfterEach(func() {
+			deleteDevWorkspaceRouting(devWorkspaceRoutingName)
+			deleteService(workspaceID, testNamespace)
+			deleteRoute(workspaceID, testNamespace)
+		})
+		It("Creates service", func() {
+			createdDWR := getExistingDevWorkspaceRouting(devWorkspaceRoutingName)
+
+			// TODO: Factor out labels?
+			expectedLabels := make(map[string]string)
+			expectedLabels[constants.DevWorkspaceIDLabel] = workspaceID
+
+			By("Checking service is created")
+			createdService := &corev1.Service{}
+			serviceNamespacedName := namespacedName(common.ServiceName(workspaceID), testNamespace)
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, serviceNamespacedName, createdService)
+				return err == nil
+			}, timeout, interval).Should(BeTrue(), "Service should exist in cluster")
+
+			Expect(createdService.Spec.Selector).Should(Equal(createdDWR.Spec.PodSelector), "Service should have pod selector from DevWorkspace metadata")
+			Expect(createdService.Spec.Type).Should(Equal(corev1.ServiceTypeClusterIP), "Service type should be Cluster IP")
+			Expect(createdService.Labels).Should(Equal(expectedLabels), "Service should contain DevWorkspace ID label")
+
+			expectedOwnerReference := devWorkspaceRoutingOwnerRef(createdDWR)
+			Expect(createdService.OwnerReferences).Should(ContainElement(expectedOwnerReference), "Service should be owned by DevWorkspaceRouting")
+
+			var expectedServicePorts []corev1.ServicePort
+			expectedServicePorts = append(expectedServicePorts, corev1.ServicePort{
+				Name:       common.EndpointName(endPointName),
+				Protocol:   corev1.ProtocolTCP,
+				Port:       int32(targetPort),
+				TargetPort: intstr.FromInt(targetPort),
+			})
+
+			Expect(createdService.Spec.Ports).Should(Equal(expectedServicePorts), "Service should contain expected ports")
+		})
 
 		It("Creates route", func() {
-			// TODO: Toggle between openshift/kuberentes for route/ingress testing
-			infrastructure.InitializeForTesting(infrastructure.Kubernetes)
 			createdDWR := getExistingDevWorkspaceRouting(devWorkspaceRoutingName)
 
 			// TODO: Factor out labels?
@@ -331,8 +417,6 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 			Expect(createdRoute.Labels).Should(Equal(expectedLabels), "Route should contain DevWorkspace ID label")
 			expectedOwnerReference := devWorkspaceRoutingOwnerRef(createdDWR)
 			Expect(createdRoute.OwnerReferences).Should(ContainElement(expectedOwnerReference), "Route should be owned by DevWorkspaceRouting")
-
 		})
 	})
-
 })
