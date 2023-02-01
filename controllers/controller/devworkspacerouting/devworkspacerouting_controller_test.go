@@ -350,6 +350,26 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 			Expect(createdIngress.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].Backend.Service.Name).Should(Equal(common.ServiceName(workspaceID)), "Incorrect ingress backend service name")
 			Expect(createdIngress.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].Backend.Service.Port).Should(Equal(networkingv1.ServiceBackendPort{Number: int32(targetPort)}), "Incorrect ingress backend service port")
 
+			By("Checking ingress points to service")
+			createdService := &corev1.Service{}
+			serviceNamespacedName := namespacedName(common.ServiceName(workspaceID), testNamespace)
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, serviceNamespacedName, createdService)
+				return err == nil
+			}, timeout, interval).Should(BeTrue(), "Service should exist in cluster")
+
+			var targetPorts []intstr.IntOrString
+			var ports []int32
+			for _, servicePort := range createdService.Spec.Ports {
+				targetPorts = append(targetPorts, servicePort.TargetPort)
+				ports = append(ports, servicePort.Port)
+			}
+			Expect(len(createdIngress.Spec.Rules)).Should(Equal(1), "Expected only a single rule for the ingress")
+			ingressRule := createdIngress.Spec.Rules[0]
+
+			Expect(ingressRule.HTTP.Paths[0].Backend.Service.Name).Should(Equal(createdService.Name), "Ingress backend service name should be service name")
+			Expect(ports).Should(ContainElement(ingressRule.HTTP.Paths[0].Backend.Service.Port.Number), "Ingress backend service port should be in service ports")
+			Expect(targetPorts).Should(ContainElement(intstr.FromInt(int(ingressRule.HTTP.Paths[0].Backend.Service.Port.Number))), "Ingress backend service port should be service target ports")
 		})
 
 	})
@@ -417,6 +437,25 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 			Expect(createdRoute.Labels).Should(Equal(expectedLabels), "Route should contain DevWorkspace ID label")
 			expectedOwnerReference := devWorkspaceRoutingOwnerRef(createdDWR)
 			Expect(createdRoute.OwnerReferences).Should(ContainElement(expectedOwnerReference), "Route should be owned by DevWorkspaceRouting")
+
+			By("Checking route points to service")
+			createdService := &corev1.Service{}
+			serviceNamespacedName := namespacedName(common.ServiceName(workspaceID), testNamespace)
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, serviceNamespacedName, createdService)
+				return err == nil
+			}, timeout, interval).Should(BeTrue(), "Service should exist in cluster")
+
+			var targetPorts []intstr.IntOrString
+			var ports []int32
+			for _, servicePort := range createdService.Spec.Ports {
+				targetPorts = append(targetPorts, servicePort.TargetPort)
+				ports = append(ports, servicePort.Port)
+			}
+			Expect(targetPorts).Should(ContainElement(createdRoute.Spec.Port.TargetPort), "Route target port should be in service target ports")
+			Expect(ports).Should(ContainElement(createdRoute.Spec.Port.TargetPort.IntVal), "Route target port should be in service ports")
+			Expect(createdRoute.Spec.To.Name).Should(Equal(createdService.Name), "Route target reference should be service name")
+
 		})
 	})
 })
