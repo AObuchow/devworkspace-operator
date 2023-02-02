@@ -7,6 +7,7 @@ import (
 
 	controllerv1alpha1 "github.com/devfile/devworkspace-operator/apis/controller/v1alpha1"
 	"github.com/devfile/devworkspace-operator/pkg/common"
+	"github.com/devfile/devworkspace-operator/pkg/config"
 	"github.com/devfile/devworkspace-operator/pkg/constants"
 	"github.com/devfile/devworkspace-operator/pkg/infrastructure"
 	. "github.com/onsi/ginkgo/v2"
@@ -114,6 +115,19 @@ func getExistingDevWorkspaceRouting(name string) *controllerv1alpha1.DevWorkspac
 	return dwr
 }
 
+func getReadyDevWorkspaceRouting(name string) *controllerv1alpha1.DevWorkspaceRouting {
+	dwr := getExistingDevWorkspaceRouting(name)
+
+	dwrNamespacedName := namespacedName(devWorkspaceRoutingName, testNamespace)
+	Eventually(func() (bool, error) {
+		if err := k8sClient.Get(ctx, dwrNamespacedName, dwr); err != nil {
+			return false, err
+		}
+		return controllerv1alpha1.DevWorkspaceRoutingPhase(dwr.Status.Phase) == controllerv1alpha1.RoutingReady, nil
+	}, timeout, interval).Should(BeTrue(), "DevWorkspaceRouting should exist in cluster")
+	return dwr
+}
+
 func deleteService(workspaceID string, namespace string) {
 	createdService := &corev1.Service{}
 	serviceNamespacedName := namespacedName(common.ServiceName(workspaceID), namespace)
@@ -146,38 +160,6 @@ func deleteIngress(workspaceID string, namespace string) {
 	deleteObject(&createdIngress)
 }
 
-func cleanup() {
-	deleteDevWorkspaceRouting(devWorkspaceRoutingName)
-
-	createdService := &corev1.Service{}
-	serviceNamespacedName := namespacedName(common.ServiceName(workspaceID), testNamespace)
-	Eventually(func() bool {
-		err := k8sClient.Get(ctx, serviceNamespacedName, createdService)
-		return err == nil
-	}, timeout, interval).Should(BeTrue(), "Service should exist in cluster")
-
-	// TODO: Need to switch between ingress and route cleanup depending on infrastructure
-
-	/* 	createdIngress := networkingv1.Ingress{}
-	   	ingressNamespacedName := namespacedName(common.RouteName(workspaceID, endPointName), testNamespace)
-	   	Eventually(func() bool {
-	   		err := k8sClient.Get(ctx, ingressNamespacedName, &createdIngress)
-	   		return err == nil
-	   	}, timeout, interval).Should(BeTrue(), "Ingress should exist in cluster") */
-
-	deleteObject(createdService)
-	//deleteObject(&createdIngress)
-
-	createdRoute := routeV1.Route{}
-	routeNamespacedName := namespacedName(common.RouteName(workspaceID, endPointName), testNamespace)
-	Eventually(func() bool {
-		err := k8sClient.Get(ctx, routeNamespacedName, &createdRoute)
-		return err == nil
-	}, timeout, interval).Should(BeTrue(), "Route should exist in cluster")
-
-	deleteObject(&createdRoute)
-}
-
 var _ = Describe("DevWorkspaceRouting Controller", func() {
 	AfterEach(func() {
 		infrastructure.InitializeForTesting(infrastructure.Kubernetes)
@@ -207,12 +189,13 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 		})
 
 		It("Gets Ready Status on OpenShift", func() {
-			By("Creating a new DevWorkspaceRouting object")
+			By("Setting infrastructure to OpenShift")
 			infrastructure.InitializeForTesting(infrastructure.OpenShiftv4)
+
+			By("Creating a new DevWorkspaceRouting object")
 
 			dwrNamespacedName := namespacedName(devWorkspaceRoutingName, testNamespace)
 			createdDWR := createDWR(workspaceID, devWorkspaceRoutingName)
-			defer deleteDevWorkspaceRouting(devWorkspaceRoutingName)
 
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, dwrNamespacedName, createdDWR)
@@ -235,12 +218,13 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 		})
 
 		It("Gets Ready Status on Kubernetes", func() {
-			By("Creating a new DevWorkspaceRouting object")
+			By("Setting infrastructure to Kubernetes")
 			infrastructure.InitializeForTesting(infrastructure.Kubernetes)
+
+			By("Creating a new DevWorkspaceRouting object")
 
 			dwrNamespacedName := namespacedName(devWorkspaceRoutingName, testNamespace)
 			createdDWR := createDWR(workspaceID, devWorkspaceRoutingName)
-			defer deleteDevWorkspaceRouting(devWorkspaceRoutingName)
 
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, dwrNamespacedName, createdDWR)
@@ -257,14 +241,14 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 
 			Expect(createdDWR.Status.Message).ShouldNot(BeNil(), "Status message should be set for preparing DevWorkspaceRoutings")
 
-			// TODO: Check owner references for services
+			// TODO: Check finalizers
+
 			// TODO: Check finalizers exist before DWR is deleted and removed after deleted for ingress, routes and services
 			// TODO: Check deletion timestamp on ingress, routes and services
 
 			// TODO: Add an endpoint that isin't controllerv1alpha1.PublicEndpointExposure to test no ingress is made for it
 
 			// TODO: Check exposed endpoints
-			// TODO: Check finalizers
 
 			// TODO: Failure cases
 			deleteDevWorkspaceRouting(devWorkspaceRoutingName)
@@ -302,8 +286,8 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 
 			Expect(createdService.Spec.Selector).Should(Equal(createdDWR.Spec.PodSelector), "Service should have pod selector from DevWorkspace metadata")
 			Expect(createdService.Spec.Type).Should(Equal(corev1.ServiceTypeClusterIP), "Service type should be Cluster IP")
-			Expect(createdService.Labels).Should(Equal(expectedLabels), "Service should contain DevWorkspace ID label")
 
+			Expect(createdService.Labels).Should(Equal(expectedLabels), "Service should contain DevWorkspace ID label")
 			expectedOwnerReference := devWorkspaceRoutingOwnerRef(createdDWR)
 			Expect(createdService.OwnerReferences).Should(ContainElement(expectedOwnerReference), "Service should be owned by DevWorkspaceRouting")
 
@@ -455,7 +439,98 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 			Expect(targetPorts).Should(ContainElement(createdRoute.Spec.Port.TargetPort), "Route target port should be in service target ports")
 			Expect(ports).Should(ContainElement(createdRoute.Spec.Port.TargetPort.IntVal), "Route target port should be in service ports")
 			Expect(createdRoute.Spec.To.Name).Should(Equal(createdService.Name), "Route target reference should be service name")
-
 		})
 	})
+
+	Context("DevWorkspaceRouting failure cases", func() {
+
+		BeforeEach(func() {
+			infrastructure.InitializeForTesting(infrastructure.Kubernetes)
+			createDWR(workspaceID, devWorkspaceRoutingName)
+			getReadyDevWorkspaceRouting(workspaceID)
+		})
+
+		AfterEach(func() {
+			config.SetGlobalConfigForTesting(testControllerCfg)
+			deleteDevWorkspaceRouting(devWorkspaceRoutingName)
+			deleteService(workspaceID, testNamespace)
+			deleteIngress(workspaceID, testNamespace)
+		})
+		It("Fails DevWorkspaceRouting with no routing class", func() {
+			// TODO: set no routing class when creating?
+			// TODO: What about changing routing classes?
+			By("Removing DevWorkspaceRouting's routing class")
+
+			Eventually(func() error {
+				createdDWR := getReadyDevWorkspaceRouting(devWorkspaceRoutingName)
+				createdDWR.Spec.RoutingClass = ""
+				return k8sClient.Update(ctx, createdDWR)
+			}, timeout, interval).Should(Succeed(), "DevWorkspaceRouting routing class should be updated on cluster")
+
+			By("Checking that the DevWorkspaceRouting's has the failed status")
+			dwrNamespacedName := namespacedName(devWorkspaceRoutingName, testNamespace)
+			updatedDWR := &controllerv1alpha1.DevWorkspaceRouting{}
+			Eventually(func() (bool, error) {
+				err := k8sClient.Get(ctx, dwrNamespacedName, updatedDWR)
+				if err != nil {
+					return false, err
+				}
+				return updatedDWR.Status.Phase == controllerv1alpha1.RoutingFailed, nil
+			}, timeout, interval).Should(BeTrue(), "DevWorkspaceRouting should be in failed phase")
+
+		})
+
+		It("Fails DevWorkspaceRouting with cluster-tls routing class on Kubernetes", func() {
+			By("Setting cluster-tls DevWorkspaceRouting's routing class")
+			Eventually(func() error {
+				createdDWR := getReadyDevWorkspaceRouting(devWorkspaceRoutingName)
+				createdDWR.Spec.RoutingClass = "cluster-tls"
+				return k8sClient.Update(ctx, createdDWR)
+			}, timeout, interval).Should(Succeed(), "DevWorkspaceRouting routing class should be updated on cluster")
+
+			By("Checking that the DevWorkspaceRouting's has the failed status")
+			dwrNamespacedName := namespacedName(devWorkspaceRoutingName, testNamespace)
+			updatedDWR := &controllerv1alpha1.DevWorkspaceRouting{}
+			Eventually(func() (bool, error) {
+				err := k8sClient.Get(ctx, dwrNamespacedName, updatedDWR)
+				if err != nil {
+					return false, err
+				}
+				return updatedDWR.Status.Phase == controllerv1alpha1.RoutingFailed, nil
+			}, timeout, interval).Should(BeTrue(), "DevWorkspaceRouting should be in failed phase")
+
+		})
+
+		It("Fails DevWorkspaceRouting when cluster host suffix missing on Kubernetes", func() {
+
+			By("Removing cluster host suffix from DevWorkspace Operator Configuration")
+			dwoc := &controllerv1alpha1.DevWorkspaceOperatorConfig{}
+			dwoc.Config = &controllerv1alpha1.OperatorConfiguration{}
+			dwoc.Config.Routing = &controllerv1alpha1.RoutingConfig{}
+			dwoc.Config.Routing.ClusterHostSuffix = ""
+			config.SetGlobalConfigForTesting(dwoc.Config)
+
+			By("Triggering a reconcile")
+			Eventually(func() error {
+				createdDWR := getReadyDevWorkspaceRouting(devWorkspaceRoutingName)
+				createdDWR.Annotations = make(map[string]string)
+				createdDWR.Annotations["test"] = "test"
+				return k8sClient.Update(ctx, createdDWR)
+			}, timeout, interval).Should(Succeed(), "DevWorkspaceRouting annotations should be updated on cluster")
+
+			By("Checking that the DevWorkspaceRouting's has the failed status")
+			dwrNamespacedName := namespacedName(devWorkspaceRoutingName, testNamespace)
+			updatedDWR := &controllerv1alpha1.DevWorkspaceRouting{}
+			Eventually(func() (controllerv1alpha1.DevWorkspaceRoutingPhase, error) {
+				err := k8sClient.Get(ctx, dwrNamespacedName, updatedDWR)
+				if err != nil {
+					return "", err
+				}
+				return updatedDWR.Status.Phase, nil
+			}, timeout, interval).Should(Equal(controllerv1alpha1.RoutingFailed), "DevWorkspaceRouting should be in failed phase")
+		})
+
+		// TODO: Could add test for failing workspace when an additional ingress rule is added?
+	})
+
 })
