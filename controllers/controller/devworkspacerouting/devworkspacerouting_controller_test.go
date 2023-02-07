@@ -1,6 +1,8 @@
 package devworkspacerouting_test
 
 import (
+	"fmt"
+
 	controllerv1alpha1 "github.com/devfile/devworkspace-operator/apis/controller/v1alpha1"
 	"github.com/devfile/devworkspace-operator/pkg/common"
 	"github.com/devfile/devworkspace-operator/pkg/config"
@@ -99,10 +101,6 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 
 			// No deletion timestamp on ingress, routes and services
 
-			// TODO: Add an endpoint that isin't controllerv1alpha1.PublicEndpointExposure to test no ingress is made for it
-
-			// TODO: Check exposed endpoints
-
 			deleteDevWorkspaceRouting(devWorkspaceRoutingName)
 			deleteService(workspaceID, testNamespace)
 			deleteIngress(workspaceID, testNamespace)
@@ -121,14 +119,14 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 			deleteService(workspaceID, testNamespace)
 			deleteIngress(workspaceID, testNamespace)
 		})
-		It("Creates service", func() {
+		It("Creates services", func() {
 			createdDWR := getExistingDevWorkspaceRouting(devWorkspaceRoutingName)
 
 			// TODO: Factor out labels?
 			expectedLabels := make(map[string]string)
 			expectedLabels[constants.DevWorkspaceIDLabel] = workspaceID
 
-			By("Checking service is created")
+			By("Checking single service for all exposed endpoints is created")
 			createdService := &corev1.Service{}
 			serviceNamespacedName := namespacedName(common.ServiceName(workspaceID), testNamespace)
 			Eventually(func() bool {
@@ -143,15 +141,35 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 			expectedOwnerReference := devWorkspaceRoutingOwnerRef(createdDWR)
 			Expect(createdService.OwnerReferences).Should(ContainElement(expectedOwnerReference), "Service should be owned by DevWorkspaceRouting")
 
+			By("Checking service has expected ports")
 			var expectedServicePorts []corev1.ServicePort
 			expectedServicePorts = append(expectedServicePorts, corev1.ServicePort{
-				Name:       common.EndpointName(endPointName),
+				Name:       common.EndpointName(exposedEndPointName),
 				Protocol:   corev1.ProtocolTCP,
-				Port:       int32(targetPort),
-				TargetPort: intstr.FromInt(targetPort),
+				Port:       int32(exposedTargetPort),
+				TargetPort: intstr.FromInt(exposedTargetPort),
 			})
 
+			expectedServicePorts = append(expectedServicePorts, corev1.ServicePort{
+				Name:       common.EndpointName(discoverableEndpointName),
+				Protocol:   corev1.ProtocolTCP,
+				Port:       int32(discoverableTargetPort),
+				TargetPort: intstr.FromInt(discoverableTargetPort),
+			})
+
+			Expect(len(createdService.Spec.Ports)).Should(Equal(2), fmt.Sprintf("Only two ports should be exposed: %s and %s. The remaining endpoint in the DevWorkspaceRouting spec has None exposure.", exposedEndPointName, discoverableEndpointName))
 			Expect(createdService.Spec.Ports).Should(Equal(expectedServicePorts), "Service should contain expected ports")
+
+			By("Checking service is created for discoverable endpoint")
+			discoverableEndpointService := &corev1.Service{}
+			discoverableEndpointServiceNamespacedName := namespacedName(common.EndpointName(discoverableEndpointName), testNamespace)
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, discoverableEndpointServiceNamespacedName, discoverableEndpointService)
+				return err == nil
+			}, timeout, interval).Should(BeTrue(), "Service for discoverable endpoint should exist in cluster")
+			Expect(len(discoverableEndpointService.Spec.Ports)).Should(Equal(1), "Service for discoverable endpoint should only have a single port")
+			Expect(discoverableEndpointService.Spec.Ports[0].Port).Should(Equal(int32(discoverableTargetPort)))
+			Expect(discoverableEndpointService.Spec.Ports[0].TargetPort).Should(Equal(intstr.FromInt(discoverableTargetPort)))
 		})
 
 		It("Creates ingress", func() {
@@ -163,7 +181,7 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 
 			By("Checking ingress is created")
 			createdIngress := networkingv1.Ingress{}
-			ingressNamespacedName := namespacedName(common.RouteName(workspaceID, endPointName), testNamespace)
+			ingressNamespacedName := namespacedName(common.RouteName(workspaceID, exposedEndPointName), testNamespace)
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, ingressNamespacedName, &createdIngress)
 				return err == nil
@@ -184,7 +202,7 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 			Expect(len(createdIngress.Spec.Rules[0].IngressRuleValue.HTTP.Paths)).Should(Equal(1), "Ingress should have a single HTTP rule value path")
 			Expect(createdIngress.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].Backend.Service).ShouldNot(BeNil(), "Ingress should have a backend service")
 			Expect(createdIngress.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].Backend.Service.Name).Should(Equal(common.ServiceName(workspaceID)), "Incorrect ingress backend service name")
-			Expect(createdIngress.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].Backend.Service.Port).Should(Equal(networkingv1.ServiceBackendPort{Number: int32(targetPort)}), "Incorrect ingress backend service port")
+			Expect(createdIngress.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].Backend.Service.Port).Should(Equal(networkingv1.ServiceBackendPort{Number: int32(exposedTargetPort)}), "Incorrect ingress backend service port")
 
 			By("Checking ingress points to service")
 			createdService := &corev1.Service{}
@@ -222,14 +240,14 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 			deleteService(workspaceID, testNamespace)
 			deleteRoute(workspaceID, testNamespace)
 		})
-		It("Creates service", func() {
+		It("Creates services", func() {
 			createdDWR := getExistingDevWorkspaceRouting(devWorkspaceRoutingName)
 
 			// TODO: Factor out labels?
 			expectedLabels := make(map[string]string)
 			expectedLabels[constants.DevWorkspaceIDLabel] = workspaceID
 
-			By("Checking service is created")
+			By("Checking single service for all exposed endpoints is created")
 			createdService := &corev1.Service{}
 			serviceNamespacedName := namespacedName(common.ServiceName(workspaceID), testNamespace)
 			Eventually(func() bool {
@@ -244,15 +262,34 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 			expectedOwnerReference := devWorkspaceRoutingOwnerRef(createdDWR)
 			Expect(createdService.OwnerReferences).Should(ContainElement(expectedOwnerReference), "Service should be owned by DevWorkspaceRouting")
 
+			By("Checking service has expected ports")
 			var expectedServicePorts []corev1.ServicePort
 			expectedServicePorts = append(expectedServicePorts, corev1.ServicePort{
-				Name:       common.EndpointName(endPointName),
+				Name:       common.EndpointName(exposedEndPointName),
 				Protocol:   corev1.ProtocolTCP,
-				Port:       int32(targetPort),
-				TargetPort: intstr.FromInt(targetPort),
+				Port:       int32(exposedTargetPort),
+				TargetPort: intstr.FromInt(exposedTargetPort),
+			})
+
+			expectedServicePorts = append(expectedServicePorts, corev1.ServicePort{
+				Name:       common.EndpointName(discoverableEndpointName),
+				Protocol:   corev1.ProtocolTCP,
+				Port:       int32(discoverableTargetPort),
+				TargetPort: intstr.FromInt(discoverableTargetPort),
 			})
 
 			Expect(createdService.Spec.Ports).Should(Equal(expectedServicePorts), "Service should contain expected ports")
+
+			By("Checking service is created for discoverable endpoint")
+			discoverableEndpointService := &corev1.Service{}
+			discoverableEndpointServiceNamespacedName := namespacedName(common.EndpointName(discoverableEndpointName), testNamespace)
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, discoverableEndpointServiceNamespacedName, discoverableEndpointService)
+				return err == nil
+			}, timeout, interval).Should(BeTrue(), "Service for discoverable endpoint should exist in cluster")
+			Expect(len(discoverableEndpointService.Spec.Ports)).Should(Equal(1), "Service for discoverable endpoint should only have a single port")
+			Expect(discoverableEndpointService.Spec.Ports[0].Port).Should(Equal(int32(discoverableTargetPort)))
+			Expect(discoverableEndpointService.Spec.Ports[0].TargetPort).Should(Equal(intstr.FromInt(discoverableTargetPort)))
 		})
 
 		It("Creates route", func() {
@@ -264,7 +301,7 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 
 			By("Checking route is created")
 			createdRoute := routeV1.Route{}
-			routeNamespacedName := namespacedName(common.RouteName(workspaceID, endPointName), testNamespace)
+			routeNamespacedName := namespacedName(common.RouteName(workspaceID, exposedEndPointName), testNamespace)
 			Eventually(func() error {
 				err := k8sClient.Get(ctx, routeNamespacedName, &createdRoute)
 				return err

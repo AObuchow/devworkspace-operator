@@ -55,11 +55,17 @@ import (
 
 const (
 	testNamespace           = "devworkspace-test"
-	devWorkspaceName        = "test-devworkspace" // TODO: Remove
 	devWorkspaceRoutingName = "test-devworkspacerouting"
 	workspaceID             = "test-id"
-	targetPort              = 7777
-	endPointName            = "test-endpoint"
+
+	exposedEndPointName = "test-endpoint"
+	exposedTargetPort   = 7777
+
+	discoverableEndpointName = "discoverable-endpoint"
+	discoverableTargetPort   = 7979
+
+	nonExposedEndpointName = "non-exposed-endpoint"
+	nonExposedTargetPort   = 8989
 )
 
 var (

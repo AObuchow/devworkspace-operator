@@ -41,13 +41,13 @@ func createPreparingDWR(workspaceID string, name string) *controllerv1alpha1.Dev
 	mainAttributes := controllerv1alpha1.Attributes{}
 	mainAttributes.PutString("type", "main")
 	exposedEndpoint := controllerv1alpha1.Endpoint{
-		Name:       endPointName,
+		Name:       exposedEndPointName,
 		Attributes: mainAttributes,
 		// TODO: This seems kinda of hacky? Ask Angel about this
 		// Lack of target port causes preparing state
 	}
 	endpointsList := map[string]controllerv1alpha1.EndpointList{
-		endPointName: {
+		exposedEndPointName: {
 			exposedEndpoint,
 		},
 	}
@@ -73,14 +73,31 @@ func createPreparingDWR(workspaceID string, name string) *controllerv1alpha1.Dev
 func createDWR(workspaceID string, name string) *controllerv1alpha1.DevWorkspaceRouting {
 	mainAttributes := controllerv1alpha1.Attributes{}
 	mainAttributes.PutString("type", "main")
+	discoverableAttributes := controllerv1alpha1.Attributes{}
+	discoverableAttributes.PutBoolean(string(controllerv1alpha1.DiscoverableAttribute), true)
+
 	exposedEndpoint := controllerv1alpha1.Endpoint{
-		Name:       endPointName,
+		Name:       exposedEndPointName,
+		Exposure:   controllerv1alpha1.PublicEndpointExposure,
 		Attributes: mainAttributes,
-		TargetPort: targetPort,
+		TargetPort: exposedTargetPort,
+	}
+	nonExposedEndpoint := controllerv1alpha1.Endpoint{
+		Name:       nonExposedEndpointName,
+		Exposure:   controllerv1alpha1.NoneEndpointExposure,
+		TargetPort: nonExposedTargetPort,
+	}
+	discoverableEndpoint := controllerv1alpha1.Endpoint{
+		Name:       discoverableEndpointName,
+		Exposure:   controllerv1alpha1.PublicEndpointExposure,
+		Attributes: discoverableAttributes,
+		TargetPort: discoverableTargetPort,
 	}
 	endpointsList := map[string]controllerv1alpha1.EndpointList{
-		endPointName: {
+		exposedEndPointName: {
 			exposedEndpoint,
+			nonExposedEndpoint,
+			discoverableEndpoint,
 		},
 	}
 
@@ -141,7 +158,7 @@ func deleteService(workspaceID string, namespace string) {
 func deleteRoute(workspaceID string, namespace string) {
 	createdRoute := routeV1.Route{}
 	// TODO: Add endpointName as a function parameter?
-	routeNamespacedName := namespacedName(common.RouteName(workspaceID, endPointName), namespace)
+	routeNamespacedName := namespacedName(common.RouteName(workspaceID, exposedEndPointName), namespace)
 	Eventually(func() bool {
 		err := k8sClient.Get(ctx, routeNamespacedName, &createdRoute)
 		return err == nil
@@ -152,7 +169,7 @@ func deleteRoute(workspaceID string, namespace string) {
 func deleteIngress(workspaceID string, namespace string) {
 	createdIngress := networkingv1.Ingress{}
 	// TODO: Add endpointName as a function parameter?
-	ingressNamespacedName := namespacedName(common.RouteName(workspaceID, endPointName), namespace)
+	ingressNamespacedName := namespacedName(common.RouteName(workspaceID, exposedEndPointName), namespace)
 	Eventually(func() bool {
 		err := k8sClient.Get(ctx, ingressNamespacedName, &createdIngress)
 		return err == nil
