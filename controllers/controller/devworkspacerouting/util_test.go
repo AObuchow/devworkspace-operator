@@ -15,23 +15,21 @@ package devworkspacerouting_test
 
 import (
 	"fmt"
-	"path"
 	"time"
 
-	dw "github.com/devfile/api/v2/pkg/apis/workspaces/v1alpha2"
 	controllerv1alpha1 "github.com/devfile/devworkspace-operator/apis/controller/v1alpha1"
 	"github.com/devfile/devworkspace-operator/pkg/common"
 	"github.com/devfile/devworkspace-operator/pkg/constants"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
+	routeV1 "github.com/openshift/api/route/v1"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	kubeclock "k8s.io/apimachinery/pkg/util/clock"
 )
 
 const (
@@ -39,56 +37,127 @@ const (
 	interval = 250 * time.Millisecond
 )
 
-var clock kubeclock.Clock = &kubeclock.RealClock{}
+func createPreparingDWR(workspaceID string, name string) *controllerv1alpha1.DevWorkspaceRouting {
+	mainAttributes := controllerv1alpha1.Attributes{}
+	mainAttributes.PutString("type", "main")
+	exposedEndpoint := controllerv1alpha1.Endpoint{
+		Name:       endPointName,
+		Attributes: mainAttributes,
+		// TODO: This seems kinda of hacky? Ask Angel about this
+		// Lack of target port causes preparing state
+	}
+	endpointsList := map[string]controllerv1alpha1.EndpointList{
+		endPointName: {
+			exposedEndpoint,
+		},
+	}
 
-func createDevWorkspace(name, fromFile string) {
-	By("Loading DevWorkspace from test file")
-	devworkspace := &dw.DevWorkspace{}
-	Expect(loadObjectFromFile(name, devworkspace, fromFile)).Should(Succeed())
+	dwr := &controllerv1alpha1.DevWorkspaceRouting{
+		Spec: controllerv1alpha1.DevWorkspaceRoutingSpec{
+			DevWorkspaceId: workspaceID,
+			RoutingClass:   controllerv1alpha1.DevWorkspaceRoutingBasic,
+			Endpoints:      endpointsList,
+			PodSelector: map[string]string{
+				constants.DevWorkspaceIDLabel: workspaceID,
+			},
+		},
+	}
 
-	By("Creating DevWorkspace on cluster")
-	Expect(k8sClient.Create(ctx, devworkspace)).Should(Succeed())
-	createdDW := &dw.DevWorkspace{}
-	Eventually(func() bool {
-		if err := k8sClient.Get(ctx, namespacedName(devWorkspaceName, testNamespace), createdDW); err != nil {
-			return false
-		}
-		return createdDW.Status.DevWorkspaceId != ""
-	}, 10*time.Second, 250*time.Millisecond).Should(BeTrue())
+	dwr.SetName(name)
+	dwr.SetNamespace(testNamespace)
+
+	Expect(k8sClient.Create(ctx, dwr)).Should(Succeed())
+	return dwr
 }
 
-func createStartedDevWorkspace(name, fromFile string) {
-	createDevWorkspace(name, fromFile)
-	devworkspace := getExistingDevWorkspace(name)
-	workspaceID := devworkspace.Status.DevWorkspaceId
+func createDWR(workspaceID string, name string) *controllerv1alpha1.DevWorkspaceRouting {
+	mainAttributes := controllerv1alpha1.Attributes{}
+	mainAttributes.PutString("type", "main")
+	exposedEndpoint := controllerv1alpha1.Endpoint{
+		Name:       endPointName,
+		Attributes: mainAttributes,
+		TargetPort: targetPort,
+	}
+	endpointsList := map[string]controllerv1alpha1.EndpointList{
+		endPointName: {
+			exposedEndpoint,
+		},
+	}
 
-	By("Manually making Routing ready to continue")
-	markRoutingReady("test-url", common.DevWorkspaceRoutingName(workspaceID))
+	dwr := &controllerv1alpha1.DevWorkspaceRouting{
+		Spec: controllerv1alpha1.DevWorkspaceRoutingSpec{
+			DevWorkspaceId: workspaceID,
+			RoutingClass:   controllerv1alpha1.DevWorkspaceRoutingBasic,
+			Endpoints:      endpointsList,
+			PodSelector: map[string]string{
+				constants.DevWorkspaceIDLabel: workspaceID,
+			},
+		},
+	}
 
-	By("Setting the deployment to have 1 ready replica")
-	markDeploymentReady(common.DeploymentName(workspaceID))
+	dwr.SetName(name)
+	dwr.SetNamespace(testNamespace)
 
-	currDW := &dw.DevWorkspace{}
-	Eventually(func() (dw.DevWorkspacePhase, error) {
-		if err := k8sClient.Get(ctx, namespacedName(devworkspace.Name, devworkspace.Namespace), currDW); err != nil {
-			return "", err
-		}
-		GinkgoWriter.Printf("Waiting for DevWorkspace to enter running phase -- Phase: %s, Message %s\n", currDW.Status.Phase, currDW.Status.Message)
-		return currDW.Status.Phase, nil
-	}, timeout, interval).Should(Equal(dw.DevWorkspaceStatusRunning), "Workspace did not enter Running phase before timeout")
+	Expect(k8sClient.Create(ctx, dwr)).Should(Succeed())
+	return dwr
 }
 
-func getExistingDevWorkspace(name string) *dw.DevWorkspace {
-	By(fmt.Sprintf("Getting existing DevWorkspace %s", name))
-	devworkspace := &dw.DevWorkspace{}
-	dwNN := namespacedName(name, testNamespace)
+func getExistingDevWorkspaceRouting(name string) *controllerv1alpha1.DevWorkspaceRouting {
+	By(fmt.Sprintf("Getting existing DevWorkspaceRouting %s", name))
+	dwr := &controllerv1alpha1.DevWorkspaceRouting{}
+	dwrNamespacedName := namespacedName(devWorkspaceRoutingName, testNamespace)
 	Eventually(func() (string, error) {
-		if err := k8sClient.Get(ctx, dwNN, devworkspace); err != nil {
+		if err := k8sClient.Get(ctx, dwrNamespacedName, dwr); err != nil {
 			return "", err
 		}
-		return devworkspace.Status.DevWorkspaceId, nil
-	}, timeout, interval).Should(Not(BeEmpty()))
-	return devworkspace
+		return dwr.Spec.DevWorkspaceId, nil
+	}, timeout, interval).Should(Not(BeEmpty()), "DevWorkspaceRouting should exist in cluster")
+	return dwr
+}
+
+func getReadyDevWorkspaceRouting(name string) *controllerv1alpha1.DevWorkspaceRouting {
+	dwr := getExistingDevWorkspaceRouting(name)
+
+	dwrNamespacedName := namespacedName(devWorkspaceRoutingName, testNamespace)
+	Eventually(func() (bool, error) {
+		if err := k8sClient.Get(ctx, dwrNamespacedName, dwr); err != nil {
+			return false, err
+		}
+		return controllerv1alpha1.DevWorkspaceRoutingPhase(dwr.Status.Phase) == controllerv1alpha1.RoutingReady, nil
+	}, timeout, interval).Should(BeTrue(), "DevWorkspaceRouting should exist in cluster")
+	return dwr
+}
+
+func deleteService(workspaceID string, namespace string) {
+	createdService := &corev1.Service{}
+	serviceNamespacedName := namespacedName(common.ServiceName(workspaceID), namespace)
+	Eventually(func() bool {
+		err := k8sClient.Get(ctx, serviceNamespacedName, createdService)
+		return err == nil
+	}, timeout, interval).Should(BeTrue(), "Service should exist in cluster")
+	deleteObject(createdService)
+}
+
+func deleteRoute(workspaceID string, namespace string) {
+	createdRoute := routeV1.Route{}
+	// TODO: Add endpointName as a function parameter?
+	routeNamespacedName := namespacedName(common.RouteName(workspaceID, endPointName), namespace)
+	Eventually(func() bool {
+		err := k8sClient.Get(ctx, routeNamespacedName, &createdRoute)
+		return err == nil
+	}, timeout, interval).Should(BeTrue(), "Route should exist in cluster")
+	deleteObject(&createdRoute)
+}
+
+func deleteIngress(workspaceID string, namespace string) {
+	createdIngress := networkingv1.Ingress{}
+	// TODO: Add endpointName as a function parameter?
+	ingressNamespacedName := namespacedName(common.RouteName(workspaceID, endPointName), namespace)
+	Eventually(func() bool {
+		err := k8sClient.Get(ctx, ingressNamespacedName, &createdIngress)
+		return err == nil
+	}, timeout, interval).Should(BeTrue(), "Ingress should exist in cluster")
+	deleteObject(&createdIngress)
 }
 
 func deleteDevWorkspaceRouting(name string) {
@@ -102,30 +171,6 @@ func deleteDevWorkspaceRouting(name string) {
 		return
 	}
 	Expect(err).Should(BeNil())
-	err = k8sClient.Get(ctx, dwNN, dwr)
-	if err != nil {
-		Expect(k8sErrors.IsNotFound(err)).Should(BeTrue(), "Unexpected error when deleting DevWorkspaceRouting: %s", err)
-		return
-	}
-	isNotFound := false
-	// TODO: Ensure DWR's actually have finalizers?
-	Eventually(func() error {
-		err := k8sClient.Get(ctx, dwNN, dwr)
-		if err != nil {
-			if k8sErrors.IsNotFound(err) {
-				isNotFound = true
-				return nil
-			}
-			return err
-		}
-		// TODO: Removing finalizers will prevent services from being deleted?
-		//dwr.Finalizers = nil
-		return k8sClient.Update(ctx, dwr)
-	}, 10*time.Second, 250*time.Millisecond).Should(Succeed(), "Could not remove finalizers from DevWorkspaceRouting")
-
-	if isNotFound {
-		return
-	}
 
 	Eventually(func() bool {
 		err := k8sClient.Get(ctx, dwNN, dwr)
@@ -145,67 +190,6 @@ func devWorkspaceRoutingOwnerRef(dwr *controllerv1alpha1.DevWorkspaceRouting) me
 	}
 }
 
-// TODO: Remove
-// deleteDevWorkspace forces a DevWorkspace to be deleted by removing all finalizers
-func deleteDevWorkspace(name string) {
-	dwNN := namespacedName(name, testNamespace)
-	dw := &dw.DevWorkspace{}
-	dw.Name = name
-	dw.Namespace = testNamespace
-	// Do nothing if already deleted
-	err := k8sClient.Delete(ctx, dw)
-	if k8sErrors.IsNotFound(err) {
-		return
-	}
-	Expect(err).Should(BeNil())
-	err = k8sClient.Get(ctx, dwNN, dw)
-	if err != nil {
-		Expect(k8sErrors.IsNotFound(err)).Should(BeTrue(), "Unexpected error when deleting DevWorkspace: %s", err)
-		return
-	}
-	isNotFound := false
-	Eventually(func() error {
-		err := k8sClient.Get(ctx, dwNN, dw)
-		if err != nil {
-			if k8sErrors.IsNotFound(err) {
-				isNotFound = true
-				return nil
-			}
-			return err
-		}
-		dw.Finalizers = nil
-		return k8sClient.Update(ctx, dw)
-	}, 10*time.Second, 250*time.Millisecond).Should(Succeed(), "Could not remove finalizers from DevWorkspace")
-
-	if isNotFound {
-		return
-	}
-
-	Eventually(func() bool {
-		err := k8sClient.Get(ctx, dwNN, dw)
-		return err != nil && k8sErrors.IsNotFound(err)
-	}, 10*time.Second, 250*time.Millisecond).Should(BeTrue(), "DevWorkspace not deleted after timeout")
-}
-
-func cleanupPVC(name string) {
-	By("Cleaning up shared PVC")
-	pvc := &corev1.PersistentVolumeClaim{}
-	pvcNN := namespacedName(name, testNamespace)
-	Eventually(func() error {
-		err := k8sClient.Get(ctx, pvcNN, pvc)
-		if k8sErrors.IsNotFound(err) {
-			return nil
-		}
-		// Need to clear finalizers to allow PVC to be cleaned up
-		pvc.Finalizers = nil
-		err = k8sClient.Update(ctx, pvc)
-		if err == nil {
-			return err
-		}
-		return fmt.Errorf("PVC not deleted yet")
-	}, timeout, interval).Should(Succeed(), "PVC should be deleted")
-}
-
 func createObject(obj crclient.Object) {
 	Expect(k8sClient.Create(ctx, obj)).Should(Succeed())
 	Eventually(func() error {
@@ -219,154 +203,6 @@ func deleteObject(obj crclient.Object) {
 		err := k8sClient.Get(ctx, namespacedName(obj.GetName(), obj.GetNamespace()), obj)
 		return k8sErrors.IsNotFound(err)
 	}, 10*time.Second, 250*time.Millisecond).Should(BeTrue(), "Deleting %s with name %s", obj.GetObjectKind(), obj.GetName())
-}
-
-func markRoutingReady(mainUrl, routingName string) {
-	namespacedName := namespacedName(routingName, testNamespace)
-	routing := &controllerv1alpha1.DevWorkspaceRouting{}
-	Eventually(func() error {
-		err := k8sClient.Get(ctx, namespacedName, routing)
-		if err != nil {
-			return err
-		}
-		routing.Status.Phase = controllerv1alpha1.RoutingReady
-		mainAttributes := controllerv1alpha1.Attributes{}
-		mainAttributes.PutString("type", "main")
-		exposedEndpoint := controllerv1alpha1.ExposedEndpoint{
-			Name:       "test-endpoint",
-			Url:        mainUrl,
-			Attributes: mainAttributes,
-		}
-		routing.Status.ExposedEndpoints = map[string]controllerv1alpha1.ExposedEndpointList{
-			"test-endpoint": {
-				exposedEndpoint,
-			},
-		}
-		return k8sClient.Status().Update(ctx, routing)
-	}, 30*time.Second, 250*time.Millisecond).Should(Succeed(), "Update DevWorkspaceRouting to have mainUrl and be ready")
-}
-
-func markDeploymentReady(deploymentName string) {
-	namespacedName := namespacedName(deploymentName, testNamespace)
-	deploy := &appsv1.Deployment{}
-	Eventually(func() error {
-		err := k8sClient.Get(ctx, namespacedName, deploy)
-		if err != nil {
-			return err
-		}
-		deploy.Status.ReadyReplicas = 1
-		deploy.Status.Replicas = 1
-		deploy.Status.AvailableReplicas = 1
-		deploy.Status.UpdatedReplicas = 1
-		return k8sClient.Status().Update(ctx, deploy)
-	}, 30*time.Second, 250*time.Millisecond).Should(Succeed(), "Update Deployment to have 1 ready replica")
-}
-
-func scaleDeploymentToZero(deploymentName string) {
-	namespacedName := namespacedName(deploymentName, testNamespace)
-	deploy := &appsv1.Deployment{}
-	Eventually(func() error {
-		err := k8sClient.Get(ctx, namespacedName, deploy)
-		if err != nil {
-			return err
-		}
-		deploy.Status.ReadyReplicas = 0
-		deploy.Status.Replicas = 0
-		deploy.Status.AvailableReplicas = 0
-		deploy.Status.UpdatedReplicas = 0
-		return k8sClient.Status().Update(ctx, deploy)
-	}, 30*time.Second, 250*time.Millisecond).Should(Succeed(), "Update Deployment to have 1 ready replica")
-}
-
-func devworkspaceOwnerRef(wksp *dw.DevWorkspace) metav1.OwnerReference {
-	boolTrue := true
-	return metav1.OwnerReference{
-		APIVersion:         "workspace.devfile.io/v1alpha2",
-		Kind:               "DevWorkspace",
-		Name:               wksp.Name,
-		UID:                wksp.UID,
-		Controller:         &boolTrue,
-		BlockOwnerDeletion: &boolTrue,
-	}
-}
-
-func generateSecret(name string, secretType corev1.SecretType) *corev1.Secret {
-	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: testNamespace,
-			Labels: map[string]string{
-				constants.DevWorkspaceWatchSecretLabel: "true",
-			},
-			Annotations: map[string]string{},
-		},
-		Type: secretType,
-		Data: map[string][]byte{},
-	}
-}
-
-func generateConfigMap(name string) *corev1.ConfigMap {
-	return &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: testNamespace,
-			Labels: map[string]string{
-				constants.DevWorkspaceWatchConfigMapLabel: "true",
-			},
-			Annotations: map[string]string{},
-		},
-		Data: map[string]string{},
-	}
-}
-
-func volumeFromSecret(secret *corev1.Secret) corev1.Volume {
-	modeReadOnly := int32(0640)
-	return corev1.Volume{
-		Name: common.AutoMountSecretVolumeName(secret.Name),
-		VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{
-				SecretName:  secret.Name,
-				DefaultMode: &modeReadOnly,
-			},
-		},
-	}
-}
-
-func volumeFromConfigMap(cm *corev1.ConfigMap) corev1.Volume {
-	modeReadOnly := int32(0640)
-	return corev1.Volume{
-		Name: common.AutoMountConfigMapVolumeName(cm.Name),
-		VolumeSource: corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{Name: cm.Name},
-				DefaultMode:          &modeReadOnly,
-			},
-		},
-	}
-}
-
-func volumeMountFromSecret(secret *corev1.Secret, mountPath, subPath string) corev1.VolumeMount {
-	if subPath != "" {
-		mountPath = path.Join(mountPath, subPath)
-	}
-	return corev1.VolumeMount{
-		Name:      common.AutoMountSecretVolumeName(secret.Name),
-		ReadOnly:  true,
-		MountPath: mountPath,
-		SubPath:   subPath,
-	}
-}
-
-func volumeMountFromConfigMap(cm *corev1.ConfigMap, mountPath, subPath string) corev1.VolumeMount {
-	if subPath != "" {
-		mountPath = path.Join(mountPath, subPath)
-	}
-	return corev1.VolumeMount{
-		Name:      common.AutoMountConfigMapVolumeName(cm.Name),
-		ReadOnly:  true,
-		MountPath: mountPath,
-		SubPath:   subPath,
-	}
 }
 
 func namespacedName(name, namespace string) types.NamespacedName {

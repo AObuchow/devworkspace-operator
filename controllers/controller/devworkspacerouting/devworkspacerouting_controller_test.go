@@ -1,10 +1,6 @@
 package devworkspacerouting_test
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
-
 	controllerv1alpha1 "github.com/devfile/devworkspace-operator/apis/controller/v1alpha1"
 	"github.com/devfile/devworkspace-operator/pkg/common"
 	"github.com/devfile/devworkspace-operator/pkg/config"
@@ -16,149 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/yaml"
 )
-
-func loadObjectFromFile(objName string, obj client.Object, filename string) error {
-	path := filepath.Join("testdata", filename)
-	bytes, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	err = yaml.Unmarshal(bytes, obj)
-	if err != nil {
-		return err
-	}
-	obj.SetNamespace(testNamespace)
-	obj.SetName(objName)
-
-	return nil
-}
-
-//TODO: Move to util test
-func createPreparingDWR(workspaceID string, name string) *controllerv1alpha1.DevWorkspaceRouting {
-	mainAttributes := controllerv1alpha1.Attributes{}
-	mainAttributes.PutString("type", "main")
-	exposedEndpoint := controllerv1alpha1.Endpoint{
-		Name:       endPointName,
-		Attributes: mainAttributes,
-		// TODO: This seems kinda of hacky? Ask Angel about this
-		// Lack of target port causes preparing state
-	}
-	endpointsList := map[string]controllerv1alpha1.EndpointList{
-		endPointName: {
-			exposedEndpoint,
-		},
-	}
-
-	dwr := &controllerv1alpha1.DevWorkspaceRouting{
-		Spec: controllerv1alpha1.DevWorkspaceRoutingSpec{
-			DevWorkspaceId: workspaceID,
-			RoutingClass:   controllerv1alpha1.DevWorkspaceRoutingBasic,
-			Endpoints:      endpointsList,
-			PodSelector: map[string]string{
-				constants.DevWorkspaceIDLabel: workspaceID,
-			},
-		},
-	}
-
-	dwr.SetName(name)
-	dwr.SetNamespace(testNamespace)
-
-	Expect(k8sClient.Create(ctx, dwr)).Should(Succeed())
-	return dwr
-}
-
-func createDWR(workspaceID string, name string) *controllerv1alpha1.DevWorkspaceRouting {
-	mainAttributes := controllerv1alpha1.Attributes{}
-	mainAttributes.PutString("type", "main")
-	exposedEndpoint := controllerv1alpha1.Endpoint{
-		Name:       endPointName,
-		Attributes: mainAttributes,
-		TargetPort: targetPort,
-	}
-	endpointsList := map[string]controllerv1alpha1.EndpointList{
-		endPointName: {
-			exposedEndpoint,
-		},
-	}
-
-	dwr := &controllerv1alpha1.DevWorkspaceRouting{
-		Spec: controllerv1alpha1.DevWorkspaceRoutingSpec{
-			DevWorkspaceId: workspaceID,
-			RoutingClass:   controllerv1alpha1.DevWorkspaceRoutingBasic,
-			Endpoints:      endpointsList,
-			PodSelector: map[string]string{
-				constants.DevWorkspaceIDLabel: workspaceID,
-			},
-		},
-	}
-
-	dwr.SetName(name)
-	dwr.SetNamespace(testNamespace)
-
-	Expect(k8sClient.Create(ctx, dwr)).Should(Succeed())
-	return dwr
-}
-
-func getExistingDevWorkspaceRouting(name string) *controllerv1alpha1.DevWorkspaceRouting {
-	By(fmt.Sprintf("Getting existing DevWorkspaceRouting %s", name))
-	dwr := &controllerv1alpha1.DevWorkspaceRouting{}
-	dwrNamespacedName := namespacedName(devWorkspaceRoutingName, testNamespace)
-	Eventually(func() (string, error) {
-		if err := k8sClient.Get(ctx, dwrNamespacedName, dwr); err != nil {
-			return "", err
-		}
-		return dwr.Spec.DevWorkspaceId, nil
-	}, timeout, interval).Should(Not(BeEmpty()), "DevWorkspaceRouting should exist in cluster")
-	return dwr
-}
-
-func getReadyDevWorkspaceRouting(name string) *controllerv1alpha1.DevWorkspaceRouting {
-	dwr := getExistingDevWorkspaceRouting(name)
-
-	dwrNamespacedName := namespacedName(devWorkspaceRoutingName, testNamespace)
-	Eventually(func() (bool, error) {
-		if err := k8sClient.Get(ctx, dwrNamespacedName, dwr); err != nil {
-			return false, err
-		}
-		return controllerv1alpha1.DevWorkspaceRoutingPhase(dwr.Status.Phase) == controllerv1alpha1.RoutingReady, nil
-	}, timeout, interval).Should(BeTrue(), "DevWorkspaceRouting should exist in cluster")
-	return dwr
-}
-
-func deleteService(workspaceID string, namespace string) {
-	createdService := &corev1.Service{}
-	serviceNamespacedName := namespacedName(common.ServiceName(workspaceID), namespace)
-	Eventually(func() bool {
-		err := k8sClient.Get(ctx, serviceNamespacedName, createdService)
-		return err == nil
-	}, timeout, interval).Should(BeTrue(), "Service should exist in cluster")
-	deleteObject(createdService)
-}
-
-func deleteRoute(workspaceID string, namespace string) {
-	createdRoute := routeV1.Route{}
-	// TODO: Add endpointName as a function parameter?
-	routeNamespacedName := namespacedName(common.RouteName(workspaceID, endPointName), namespace)
-	Eventually(func() bool {
-		err := k8sClient.Get(ctx, routeNamespacedName, &createdRoute)
-		return err == nil
-	}, timeout, interval).Should(BeTrue(), "Route should exist in cluster")
-	deleteObject(&createdRoute)
-}
-
-func deleteIngress(workspaceID string, namespace string) {
-	createdIngress := networkingv1.Ingress{}
-	// TODO: Add endpointName as a function parameter?
-	ingressNamespacedName := namespacedName(common.RouteName(workspaceID, endPointName), namespace)
-	Eventually(func() bool {
-		err := k8sClient.Get(ctx, ingressNamespacedName, &createdIngress)
-		return err == nil
-	}, timeout, interval).Should(BeTrue(), "Ingress should exist in cluster")
-	deleteObject(&createdIngress)
-}
 
 var _ = Describe("DevWorkspaceRouting Controller", func() {
 	AfterEach(func() {
@@ -241,16 +95,14 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 
 			Expect(createdDWR.Status.Message).ShouldNot(BeNil(), "Status message should be set for preparing DevWorkspaceRoutings")
 
-			// TODO: Check finalizers
+			// No finalizer check required as basic_solver and cluster_solver don't require finalizers
 
-			// TODO: Check finalizers exist before DWR is deleted and removed after deleted for ingress, routes and services
-			// TODO: Check deletion timestamp on ingress, routes and services
+			// No deletion timestamp on ingress, routes and services
 
 			// TODO: Add an endpoint that isin't controllerv1alpha1.PublicEndpointExposure to test no ingress is made for it
 
 			// TODO: Check exposed endpoints
 
-			// TODO: Failure cases
 			deleteDevWorkspaceRouting(devWorkspaceRoutingName)
 			deleteService(workspaceID, testNamespace)
 			deleteIngress(workspaceID, testNamespace)
