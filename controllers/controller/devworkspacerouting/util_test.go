@@ -147,9 +147,9 @@ func getReadyDevWorkspaceRouting(name string) *controllerv1alpha1.DevWorkspaceRo
 	return dwr
 }
 
-func deleteService(workspaceID string, namespace string) {
+func deleteService(serviceName string, namespace string) {
 	createdService := &corev1.Service{}
-	serviceNamespacedName := namespacedName(common.ServiceName(workspaceID), namespace)
+	serviceNamespacedName := namespacedName(serviceName, namespace)
 	Eventually(func() bool {
 		err := k8sClient.Get(ctx, serviceNamespacedName, createdService)
 		return err == nil

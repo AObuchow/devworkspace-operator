@@ -17,7 +17,6 @@ import (
 	"context"
 	"fmt"
 	"go/build"
-	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -26,7 +25,6 @@ import (
 	dwv2 "github.com/devfile/api/v2/pkg/apis/workspaces/v1alpha2"
 	controllerv1alpha1 "github.com/devfile/devworkspace-operator/apis/controller/v1alpha1"
 	"github.com/devfile/devworkspace-operator/controllers/controller/devworkspacerouting"
-	"github.com/devfile/devworkspace-operator/controllers/controller/devworkspacerouting/internal/testutil"
 	"github.com/devfile/devworkspace-operator/controllers/controller/devworkspacerouting/solvers"
 	configv1 "github.com/openshift/api/config/v1"
 	oauthv1 "github.com/openshift/api/oauth/v1"
@@ -230,10 +228,4 @@ func setupEnvVars() error {
 	}
 
 	return nil
-}
-
-func getBasicTestHttpClient() *http.Client {
-	return &http.Client{
-		Transport: &testutil.TestRoundTripper{},
-	}
 }

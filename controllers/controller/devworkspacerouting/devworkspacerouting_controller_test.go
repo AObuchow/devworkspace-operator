@@ -71,7 +71,8 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 			Expect(createdDWR.Status.Message).Should(Equal("DevWorkspaceRouting prepared"), "Status message should indicate that the DevWorkspaceRouting is prepared")
 
 			deleteDevWorkspaceRouting(devWorkspaceRoutingName)
-			deleteService(workspaceID, testNamespace)
+			deleteService(common.ServiceName(workspaceID), testNamespace)
+			deleteService(common.EndpointName(discoverableEndpointName), testNamespace)
 			deleteRoute(workspaceID, testNamespace)
 		})
 
@@ -105,7 +106,8 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 			// No deletion timestamp on ingress, routes and services
 
 			deleteDevWorkspaceRouting(devWorkspaceRoutingName)
-			deleteService(workspaceID, testNamespace)
+			deleteService(common.ServiceName(workspaceID), testNamespace)
+			deleteService(common.EndpointName(discoverableEndpointName), testNamespace)
 			deleteIngress(workspaceID, testNamespace)
 		})
 	})
@@ -119,7 +121,8 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 
 		AfterEach(func() {
 			deleteDevWorkspaceRouting(devWorkspaceRoutingName)
-			deleteService(workspaceID, testNamespace)
+			deleteService(common.ServiceName(workspaceID), testNamespace)
+			deleteService(common.EndpointName(discoverableEndpointName), testNamespace)
 			deleteIngress(workspaceID, testNamespace)
 		})
 		It("Creates services", func() {
@@ -248,7 +251,8 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 
 		AfterEach(func() {
 			deleteDevWorkspaceRouting(devWorkspaceRoutingName)
-			deleteService(workspaceID, testNamespace)
+			deleteService(common.ServiceName(workspaceID), testNamespace)
+			deleteService(common.EndpointName(discoverableEndpointName), testNamespace)
 			deleteRoute(workspaceID, testNamespace)
 		})
 		It("Creates services", func() {
@@ -361,11 +365,59 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 		AfterEach(func() {
 			config.SetGlobalConfigForTesting(testControllerCfg)
 			deleteDevWorkspaceRouting(devWorkspaceRoutingName)
-			deleteService(workspaceID, testNamespace)
+			deleteService(common.ServiceName(workspaceID), testNamespace)
+			deleteService(common.EndpointName(discoverableEndpointName), testNamespace)
 			deleteIngress(workspaceID, testNamespace)
 		})
 		It("Fails DevWorkspaceRouting with no routing class", func() {
-			// TODO: set no routing class when creating?
+
+			By("Creating DevWorkspaceRouting with no routing class")
+			mainAttributes := controllerv1alpha1.Attributes{}
+			mainAttributes.PutString("type", "main")
+
+			exposedEndpoint := controllerv1alpha1.Endpoint{
+				Name:       exposedEndPointName,
+				Exposure:   controllerv1alpha1.PublicEndpointExposure,
+				Attributes: mainAttributes,
+				TargetPort: exposedTargetPort,
+			}
+
+			endpointsList := map[string]controllerv1alpha1.EndpointList{
+				exposedEndPointName: {
+					exposedEndpoint,
+				},
+			}
+
+			dwr := &controllerv1alpha1.DevWorkspaceRouting{
+				Spec: controllerv1alpha1.DevWorkspaceRoutingSpec{
+					DevWorkspaceId: workspaceID,
+					RoutingClass:   "",
+					Endpoints:      endpointsList,
+					PodSelector: map[string]string{
+						constants.DevWorkspaceIDLabel: workspaceID,
+					},
+				},
+			}
+
+			dwrName := "dwr-with-no-routing-class"
+			dwr.SetName(dwrName)
+			dwr.SetNamespace(testNamespace)
+
+			Expect(k8sClient.Create(ctx, dwr)).Should(Succeed())
+
+			By("Checking that the DevWorkspaceRouting's has the failed status")
+			dwrNamespacedName := namespacedName(dwrName, testNamespace)
+			updatedDWR := &controllerv1alpha1.DevWorkspaceRouting{}
+			Eventually(func() (bool, error) {
+				err := k8sClient.Get(ctx, dwrNamespacedName, updatedDWR)
+				if err != nil {
+					return false, err
+				}
+				return updatedDWR.Status.Phase == controllerv1alpha1.RoutingFailed, nil
+			}, timeout, interval).Should(BeTrue(), "DevWorkspaceRouting should be in failed phase")
+		})
+
+		It("Fails DevWorkspaceRouting when routing class removed", func() {
 			// TODO: What about changing routing classes?
 			By("Removing DevWorkspaceRouting's routing class")
 
