@@ -13,6 +13,7 @@ import (
 	routeV1 "github.com/openshift/api/route/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -67,6 +68,7 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 			}, timeout, interval).Should(Equal(controllerv1alpha1.RoutingReady), "DevWorkspaceRouting should have Ready phase")
 
 			Expect(createdDWR.Status.Message).ShouldNot(BeNil(), "Status message should be set for preparing DevWorkspaceRoutings")
+			Expect(createdDWR.Status.Message).Should(Equal("DevWorkspaceRouting prepared"), "Status message should indicate that the DevWorkspaceRouting is prepared")
 
 			deleteDevWorkspaceRouting(devWorkspaceRoutingName)
 			deleteService(workspaceID, testNamespace)
@@ -96,6 +98,7 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 			}, timeout, interval).Should(Equal(controllerv1alpha1.RoutingReady), "DevWorkspaceRouting should have Ready phase")
 
 			Expect(createdDWR.Status.Message).ShouldNot(BeNil(), "Status message should be set for preparing DevWorkspaceRoutings")
+			Expect(createdDWR.Status.Message).Should(Equal("DevWorkspaceRouting prepared"), "Status message should indicate that the DevWorkspaceRouting is prepared")
 
 			// No finalizer check required as basic_solver and cluster_solver don't require finalizers
 
@@ -224,6 +227,14 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 			Expect(ingressRule.HTTP.Paths[0].Backend.Service.Name).Should(Equal(createdService.Name), "Ingress backend service name should be service name")
 			Expect(ports).Should(ContainElement(ingressRule.HTTP.Paths[0].Backend.Service.Port.Number), "Ingress backend service port should be in service ports")
 			Expect(targetPorts).Should(ContainElement(intstr.FromInt(int(ingressRule.HTTP.Paths[0].Backend.Service.Port.Number))), "Ingress backend service port should be service target ports")
+
+			By("Checking ingress is not created for non-exposed endpoint")
+			nonExposedIngress := networkingv1.Ingress{}
+			nonExposedIngressNamespacedName := namespacedName(common.RouteName(workspaceID, nonExposedEndpointName), testNamespace)
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, nonExposedIngressNamespacedName, &nonExposedIngress)
+				return k8sErrors.IsNotFound(err)
+			}, timeout, interval).Should(BeTrue(), "Ingress for non-exposed endpoint should not exist in cluster")
 		})
 
 	})
@@ -328,6 +339,14 @@ var _ = Describe("DevWorkspaceRouting Controller", func() {
 			Expect(targetPorts).Should(ContainElement(createdRoute.Spec.Port.TargetPort), "Route target port should be in service target ports")
 			Expect(ports).Should(ContainElement(createdRoute.Spec.Port.TargetPort.IntVal), "Route target port should be in service ports")
 			Expect(createdRoute.Spec.To.Name).Should(Equal(createdService.Name), "Route target reference should be service name")
+
+			By("Checking route is not created for non-exposed endpoint")
+			nonExposedRoute := routeV1.Route{}
+			nonExposedRouteNamespacedName := namespacedName(common.RouteName(workspaceID, nonExposedEndpointName), testNamespace)
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, nonExposedRouteNamespacedName, &nonExposedRoute)
+				return k8sErrors.IsNotFound(err)
+			}, timeout, interval).Should(BeTrue(), "Route for non-exposed endpoint should not exist in cluster")
 		})
 	})
 

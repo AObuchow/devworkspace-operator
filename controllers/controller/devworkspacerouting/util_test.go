@@ -43,8 +43,10 @@ func createPreparingDWR(workspaceID string, name string) *controllerv1alpha1.Dev
 	exposedEndpoint := controllerv1alpha1.Endpoint{
 		Name:       exposedEndPointName,
 		Attributes: mainAttributes,
-		// TODO: This seems kinda of hacky? Ask Angel about this
-		// Lack of target port causes preparing state
+		// Target port must be within range 1 and 65535
+		// Created service will be invalid on cluster and error will be logged
+		// DWR will continue trying to reconcile however, keeping it stuck in preparing phase
+		TargetPort: 0,
 	}
 	endpointsList := map[string]controllerv1alpha1.EndpointList{
 		exposedEndPointName: {
@@ -178,7 +180,7 @@ func deleteIngress(workspaceID string, namespace string) {
 }
 
 func deleteDevWorkspaceRouting(name string) {
-	dwNN := namespacedName(name, testNamespace)
+	dwrNN := namespacedName(name, testNamespace)
 	dwr := &controllerv1alpha1.DevWorkspaceRouting{}
 	dwr.Name = name
 	dwr.Namespace = testNamespace
@@ -190,7 +192,7 @@ func deleteDevWorkspaceRouting(name string) {
 	Expect(err).Should(BeNil())
 
 	Eventually(func() bool {
-		err := k8sClient.Get(ctx, dwNN, dwr)
+		err := k8sClient.Get(ctx, dwrNN, dwr)
 		return err != nil && k8sErrors.IsNotFound(err)
 	}, 10*time.Second, 250*time.Millisecond).Should(BeTrue(), "DevWorkspaceRouting not deleted after timeout")
 }
