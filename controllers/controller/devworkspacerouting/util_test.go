@@ -35,6 +35,22 @@ import (
 const (
 	timeout  = 10 * time.Second
 	interval = 250 * time.Millisecond
+
+	testNamespace           = "devworkspace-test"
+	devWorkspaceRoutingName = "test-devworkspacerouting"
+	testWorkspaceID         = "test-id"
+	testMachineName         = "test-machine-name"
+
+	exposedEndPointName      = "test-endpoint"
+	exposedTargetPort        = 7777
+	discoverableEndpointName = "discoverable-endpoint"
+	discoverableTargetPort   = 7979
+	nonExposedEndpointName   = "non-exposed-endpoint"
+	nonExposedTargetPort     = 8989
+)
+
+var (
+	ExpectedLabels = map[string]string{constants.DevWorkspaceIDLabel: testWorkspaceID}
 )
 
 func createPreparingDWR(workspaceID string, name string) *controllerv1alpha1.DevWorkspaceRouting {
@@ -48,8 +64,8 @@ func createPreparingDWR(workspaceID string, name string) *controllerv1alpha1.Dev
 		// DWR will continue trying to reconcile however, keeping it stuck in preparing phase
 		TargetPort: 0,
 	}
-	endpointsList := map[string]controllerv1alpha1.EndpointList{
-		exposedEndPointName: {
+	machineEndpointsMap := map[string]controllerv1alpha1.EndpointList{
+		testMachineName: {
 			exposedEndpoint,
 		},
 	}
@@ -58,16 +74,14 @@ func createPreparingDWR(workspaceID string, name string) *controllerv1alpha1.Dev
 		Spec: controllerv1alpha1.DevWorkspaceRoutingSpec{
 			DevWorkspaceId: workspaceID,
 			RoutingClass:   controllerv1alpha1.DevWorkspaceRoutingBasic,
-			Endpoints:      endpointsList,
+			Endpoints:      machineEndpointsMap,
 			PodSelector: map[string]string{
 				constants.DevWorkspaceIDLabel: workspaceID,
 			},
 		},
 	}
-
 	dwr.SetName(name)
 	dwr.SetNamespace(testNamespace)
-
 	Expect(k8sClient.Create(ctx, dwr)).Should(Succeed())
 	return dwr
 }
@@ -95,8 +109,8 @@ func createDWR(workspaceID string, name string) *controllerv1alpha1.DevWorkspace
 		Attributes: discoverableAttributes,
 		TargetPort: discoverableTargetPort,
 	}
-	endpointsList := map[string]controllerv1alpha1.EndpointList{
-		exposedEndPointName: {
+	machineEndpointsMap := map[string]controllerv1alpha1.EndpointList{
+		"test-machine-name": {
 			exposedEndpoint,
 			nonExposedEndpoint,
 			discoverableEndpoint,
@@ -107,7 +121,7 @@ func createDWR(workspaceID string, name string) *controllerv1alpha1.DevWorkspace
 		Spec: controllerv1alpha1.DevWorkspaceRoutingSpec{
 			DevWorkspaceId: workspaceID,
 			RoutingClass:   controllerv1alpha1.DevWorkspaceRoutingBasic,
-			Endpoints:      endpointsList,
+			Endpoints:      machineEndpointsMap,
 			PodSelector: map[string]string{
 				constants.DevWorkspaceIDLabel: workspaceID,
 			},
@@ -138,12 +152,12 @@ func getReadyDevWorkspaceRouting(name string) *controllerv1alpha1.DevWorkspaceRo
 	dwr := getExistingDevWorkspaceRouting(name)
 
 	dwrNamespacedName := namespacedName(devWorkspaceRoutingName, testNamespace)
-	Eventually(func() (bool, error) {
+	Eventually(func() (controllerv1alpha1.DevWorkspaceRoutingPhase, error) {
 		if err := k8sClient.Get(ctx, dwrNamespacedName, dwr); err != nil {
-			return false, err
+			return "", err
 		}
-		return controllerv1alpha1.DevWorkspaceRoutingPhase(dwr.Status.Phase) == controllerv1alpha1.RoutingReady, nil
-	}, timeout, interval).Should(BeTrue(), "DevWorkspaceRouting should exist in cluster")
+		return controllerv1alpha1.DevWorkspaceRoutingPhase(dwr.Status.Phase), nil
+	}, timeout, interval).Should(Equal(controllerv1alpha1.RoutingReady), "Ready DevWorkspaceRouting should exist in cluster")
 	return dwr
 }
 
@@ -157,10 +171,9 @@ func deleteService(serviceName string, namespace string) {
 	deleteObject(createdService)
 }
 
-func deleteRoute(workspaceID string, namespace string) {
+func deleteRoute(endpointName string, namespace string) {
 	createdRoute := routeV1.Route{}
-	// TODO: Add endpointName as a function parameter?
-	routeNamespacedName := namespacedName(common.RouteName(workspaceID, exposedEndPointName), namespace)
+	routeNamespacedName := namespacedName(common.RouteName(testWorkspaceID, endpointName), namespace)
 	Eventually(func() bool {
 		err := k8sClient.Get(ctx, routeNamespacedName, &createdRoute)
 		return err == nil
@@ -168,10 +181,9 @@ func deleteRoute(workspaceID string, namespace string) {
 	deleteObject(&createdRoute)
 }
 
-func deleteIngress(workspaceID string, namespace string) {
+func deleteIngress(endpointName string, namespace string) {
 	createdIngress := networkingv1.Ingress{}
-	// TODO: Add endpointName as a function parameter?
-	ingressNamespacedName := namespacedName(common.RouteName(workspaceID, exposedEndPointName), namespace)
+	ingressNamespacedName := namespacedName(common.RouteName(testWorkspaceID, endpointName), namespace)
 	Eventually(func() bool {
 		err := k8sClient.Get(ctx, ingressNamespacedName, &createdIngress)
 		return err == nil
@@ -207,13 +219,6 @@ func devWorkspaceRoutingOwnerRef(dwr *controllerv1alpha1.DevWorkspaceRouting) me
 		Controller:         &boolTrue,
 		BlockOwnerDeletion: &boolTrue,
 	}
-}
-
-func createObject(obj crclient.Object) {
-	Expect(k8sClient.Create(ctx, obj)).Should(Succeed())
-	Eventually(func() error {
-		return k8sClient.Get(ctx, namespacedName(obj.GetName(), obj.GetNamespace()), obj)
-	}, 10*time.Second, 250*time.Millisecond).Should(Succeed(), "Creating %s with name %s", obj.GetObjectKind(), obj.GetName())
 }
 
 func deleteObject(obj crclient.Object) {

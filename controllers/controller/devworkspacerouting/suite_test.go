@@ -26,11 +26,7 @@ import (
 	controllerv1alpha1 "github.com/devfile/devworkspace-operator/apis/controller/v1alpha1"
 	"github.com/devfile/devworkspace-operator/controllers/controller/devworkspacerouting"
 	"github.com/devfile/devworkspace-operator/controllers/controller/devworkspacerouting/solvers"
-	configv1 "github.com/openshift/api/config/v1"
-	oauthv1 "github.com/openshift/api/oauth/v1"
 	routev1 "github.com/openshift/api/route/v1"
-	securityv1 "github.com/openshift/api/security/v1"
-	templatev1 "github.com/openshift/api/template/v1"
 
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,21 +45,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-)
-
-const (
-	testNamespace           = "devworkspace-test"
-	devWorkspaceRoutingName = "test-devworkspacerouting"
-	workspaceID             = "test-id"
-
-	exposedEndPointName = "test-endpoint"
-	exposedTargetPort   = 7777
-
-	discoverableEndpointName = "discoverable-endpoint"
-	discoverableTargetPort   = 7979
-
-	nonExposedEndpointName = "non-exposed-endpoint"
-	nonExposedTargetPort   = 8989
 )
 
 var (
@@ -87,7 +68,7 @@ func TestAPIs(t *testing.T) {
 
 	RegisterFailHandler(Fail)
 
-	RunSpecs(t, "Controller Suite")
+	RunSpecs(t, "DevWorkspaceRouting Controller Suite")
 }
 
 var _ = BeforeSuite(func() {
@@ -121,21 +102,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	err = dwv2.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
-
-	// Openshift schemas
-
 	err = routev1.Install(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-	err = templatev1.Install(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-	err = oauthv1.Install(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-	// Enable controller to manage SCCs in OpenShift; permissions to do this are not requested
-	// by default and must be added by a cluster-admin.
-	err = securityv1.Install(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-	// Enable controller to read cluster-wide proxy on OpenShift
-	err = configv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
@@ -171,12 +138,6 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
-	// TODO: Remove?
-	// Set HTTP client to fail all requests by default; tests that require HTTP must set this up directly
-	//workspacecontroller.SetupHttpClientsForTesting(getBasicTestHttpClient())
-
-	// Skip trying to set up / test webhooks for now
-
 	By("Creating Namespace for the DevWorkspaceRouting")
 	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -209,7 +170,6 @@ func setupEnvVars() error {
 		return err
 	}
 
-	// TODO: Change to DWR?
 	var dwContainer *corev1.Container
 	for _, container := range deploy.Spec.Template.Spec.Containers {
 		if container.Name == "devworkspace-controller" {
