@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/devfile/devworkspace-operator/controllers/workspace/metrics"
 	"github.com/devfile/devworkspace-operator/pkg/library/overrides"
 	"github.com/devfile/devworkspace-operator/pkg/library/status"
 	nsconfig "github.com/devfile/devworkspace-operator/pkg/provision/config"
@@ -36,8 +37,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	runtimeClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -136,7 +137,7 @@ func SyncDeploymentToCluster(
 }
 
 // DeleteWorkspaceDeployment deletes the deployment for the DevWorkspace
-func DeleteWorkspaceDeployment(ctx context.Context, workspace *common.DevWorkspaceWithConfig, client runtimeClient.Client) (wait bool, err error) {
+func DeleteWorkspaceDeployment(ctx context.Context, workspace *common.DevWorkspaceWithConfig, client k8sclient.Client) (wait bool, err error) {
 	err = client.Delete(ctx, &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: workspace.Namespace,
@@ -153,20 +154,49 @@ func DeleteWorkspaceDeployment(ctx context.Context, workspace *common.DevWorkspa
 }
 
 // ScaleDeploymentToZero scales the cluster deployment to zero
-func ScaleDeploymentToZero(ctx context.Context, workspace *common.DevWorkspaceWithConfig, client runtimeClient.Client) error {
+func ScaleDeploymentToZero(ctx context.Context, workspace *common.DevWorkspaceWithConfig, client k8sclient.Client) error {
 	patch := []byte(`{"spec":{"replicas": 0}}`)
 	err := client.Patch(ctx, &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: workspace.Namespace,
 			Name:      common.DeploymentName(workspace.Status.DevWorkspaceId),
 		},
-	}, runtimeClient.RawPatch(types.StrategicMergePatchType, patch))
+	}, k8sclient.RawPatch(types.StrategicMergePatchType, patch))
 
 	if err != nil && !k8sErrors.IsNotFound(err) {
 		return err
 	}
 
 	return nil
+}
+
+// Returns an error message and a FailureReason if the workspace related pods are in an unrecoverable state, which may
+// have been caused  by an ignoredUnrecoverableEvent.
+// Otherwise, empty strings are returned for the error message and failure reason.
+func CheckWorkspaceForIgnoredPodEvents(workspace *common.DevWorkspaceWithConfig, clusterAPI sync.ClusterAPI) (errMessage string, reason metrics.FailureReason) {
+	workspaceIDLabel := k8sclient.MatchingLabels{constants.DevWorkspaceIDLabel: workspace.Status.DevWorkspaceId}
+	// CheckPodsState returns either a message or error, not both.
+	errMsg, checkErr := status.CheckPodsState(workspace.Status.DevWorkspaceId, workspace.Namespace, workspaceIDLabel, []string{}, clusterAPI)
+	if checkErr != nil {
+		status := DeploymentProvisioningStatus{
+			ProvisioningStatus: ProvisioningStatus{
+				Err: checkErr,
+			},
+		}
+		failureReason := DetermineProvisioningFailureReason(status)
+		return checkErr.Error(), failureReason
+	}
+	if errMsg != "" {
+		status := DeploymentProvisioningStatus{
+			ProvisioningStatus: ProvisioningStatus{
+				FailStartup: true,
+				Message:     errMsg,
+			},
+		}
+		failureReason := DetermineProvisioningFailureReason(status)
+		return errMsg, failureReason
+	}
+	return "", ""
 }
 
 func getSpecDeployment(

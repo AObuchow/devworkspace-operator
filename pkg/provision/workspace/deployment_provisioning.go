@@ -13,12 +13,12 @@
 // limitations under the License.
 //
 
-package metrics
+package workspace
 
 import (
 	"strings"
 
-	"github.com/devfile/devworkspace-operator/pkg/provision/workspace"
+	"github.com/devfile/devworkspace-operator/controllers/workspace/metrics"
 )
 
 var badRequestFailures = []string{
@@ -37,17 +37,17 @@ var infrastructureFailures = []string{
 // DetermineProvisioningFailureReason scans a deployment provisioning status info message
 // and returns the corresponding failure reason.
 // If a failure reason cannot be found, an Unknown reason is returned.
-func DetermineProvisioningFailureReason(status workspace.DeploymentProvisioningStatus) FailureReason {
+func DetermineProvisioningFailureReason(status DeploymentProvisioningStatus) metrics.FailureReason {
 	failStartupMsg := status.Info()
 	for _, failure := range badRequestFailures {
 		if strings.Contains(failStartupMsg, failure) {
-			return ReasonBadRequest
+			return metrics.ReasonBadRequest
 		}
 	}
 	for _, failure := range infrastructureFailures {
 		if strings.Contains(failStartupMsg, failure) {
-			return ReasonInfrastructureFailure
+			return metrics.ReasonInfrastructureFailure
 		}
 	}
-	return ReasonUnknown
+	return metrics.ReasonUnknown
 }

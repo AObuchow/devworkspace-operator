@@ -36,7 +36,6 @@ import (
 	"github.com/devfile/devworkspace-operator/pkg/library/flatten"
 	kubesync "github.com/devfile/devworkspace-operator/pkg/library/kubernetes"
 	"github.com/devfile/devworkspace-operator/pkg/library/projects"
-	"github.com/devfile/devworkspace-operator/pkg/library/status"
 	"github.com/devfile/devworkspace-operator/pkg/provision/automount"
 	"github.com/devfile/devworkspace-operator/pkg/provision/metadata"
 	"github.com/devfile/devworkspace-operator/pkg/provision/storage"
@@ -223,7 +222,7 @@ func (r *DevWorkspaceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		if err == nil {
 			if timeoutErr := checkForStartTimeout(clusterWorkspace); timeoutErr != nil {
 				// Check if an ignoredUnrecoverableEvent occured and report it alongside the timeout notice
-				errMsg, failureReason := checkIgnoredPodEvents(workspace, clusterAPI)
+				errMsg, failureReason := wsprovision.CheckWorkspaceForIgnoredPodEvents(workspace, clusterAPI)
 				if errMsg != "" {
 					failureMsg := fmt.Sprintf("%s. Reason: %s", timeoutErr.Error(), errMsg)
 					reconcileResult, err = r.failWorkspace(workspace, failureMsg, failureReason, reqLogger, &reconcileStatus)
@@ -488,7 +487,7 @@ func (r *DevWorkspaceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	deploymentStatus := wsprovision.SyncDeploymentToCluster(workspace, allPodAdditions, serviceAcctName, clusterAPI)
 	if !deploymentStatus.Continue {
 		if deploymentStatus.FailStartup {
-			failureReason := metrics.DetermineProvisioningFailureReason(deploymentStatus)
+			failureReason := wsprovision.DetermineProvisioningFailureReason(deploymentStatus)
 			return r.failWorkspace(workspace, deploymentStatus.Info(), failureReason, reqLogger, &reconcileStatus)
 		}
 		reqLogger.Info("Waiting on deployment to be ready")
@@ -668,37 +667,6 @@ func (r *DevWorkspaceReconciler) getWorkspaceId(ctx context.Context, workspace *
 		}
 		return "workspace" + strings.Join(strings.Split(uid.String(), "-")[0:3], ""), nil
 	}
-}
-
-// TODO: Move this - issue is that check.go has import cycle with metrics
-// Returns an error message and a FailureReason if the workspace related pods are in an unrecoverable state, which may
-// have been caused  by an ignoredUnrecoverableEvent.
-// Otherwise, empty strings are returned for the error message and failure reason.
-func checkIgnoredPodEvents(workspace *common.DevWorkspaceWithConfig, clusterAPI sync.ClusterAPI) (errMessage string, reason metrics.FailureReason) {
-	// Check if an ignoredUnrecoverableEvent occured and report it alongside the timeout notice
-	workspaceIDLabel := client.MatchingLabels{constants.DevWorkspaceIDLabel: workspace.Status.DevWorkspaceId}
-	// CheckPodsState returns either a message or error, not both.
-	errMsg, checkErr := status.CheckPodsState(workspace.Status.DevWorkspaceId, workspace.Namespace, workspaceIDLabel, []string{}, clusterAPI)
-	if checkErr != nil {
-		status := wsprovision.DeploymentProvisioningStatus{
-			ProvisioningStatus: wsprovision.ProvisioningStatus{
-				Err: checkErr,
-			},
-		}
-		failureReason := metrics.DetermineProvisioningFailureReason(status)
-		return checkErr.Error(), failureReason
-	}
-	if errMsg != "" {
-		status := wsprovision.DeploymentProvisioningStatus{
-			ProvisioningStatus: wsprovision.ProvisioningStatus{
-				FailStartup: true,
-				Message:     errMsg,
-			},
-		}
-		failureReason := metrics.DetermineProvisioningFailureReason(status)
-		return errMsg, failureReason
-	}
-	return "", ""
 }
 
 func (r *DevWorkspaceReconciler) SetupWithManager(mgr ctrl.Manager) error {
