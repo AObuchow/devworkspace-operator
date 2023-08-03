@@ -225,17 +225,33 @@ func mergeContainerContributions(flattenedSpec *dw.DevWorkspaceTemplateSpec, def
 // Finds a component that is a suitable merge target for container contributions and returns its name.
 // The following rules are followed when finding a merge target:
 //
-// - A container component that has the merge-contribution: true attribute will automatically be selected as a merge target.
+//   - A container component that has the merge-contribution: true attribute will automatically be selected as a merge target.
 //
-// - A container component that has the merge-contribution: false attribute will be never be selected as a merge target.
+//   - A container component that has the merge-contribution: false attribute will be never be selected as a merge target.
 //
-// - Otherwise, the first container component found that was not imported by a plugin or parent devworkspace (i.e. the controller.devfile.io/imported-by attribute is not present)
-// will be selected as a merge target.
+//   - Otherwise, the first container component found that was not imported by a plugin devworkspace
+//     will be selected as a merge target, with components defined in the devworkspace taking priority over
+//     components imported from the parent devworkspace.
 //
 // If no suitable merge target is found, an error is returned.
 func findMergeTarget(flattenedSpec *dw.DevWorkspaceTemplateSpec) (mergeTargetComponentName string, err error) {
 	firstComponent := ""
+
+	var sortedComponents []dw.Component
+	var importedComponents []dw.Component
 	for _, component := range flattenedSpec.Components {
+		pluginSource := component.Attributes.GetString(constants.PluginSourceAttribute, nil)
+		if pluginSource != "" {
+			importedComponents = append(importedComponents, component)
+			continue
+		}
+		sortedComponents = append(sortedComponents, component)
+	}
+
+	// Non-parent components take priority as implicit merge targets over imported (parent) components
+	// so we iterate over non-parent components first, and imported components last
+	sortedComponents = append(sortedComponents, importedComponents...)
+	for _, component := range sortedComponents {
 		if component.Container == nil {
 			continue
 		}
@@ -249,7 +265,7 @@ func findMergeTarget(flattenedSpec *dw.DevWorkspaceTemplateSpec) (mergeTargetCom
 			continue
 		}
 
-		// The target must not have been imported by a plugin.
+		// The implicit merge target must not have been imported by a plugin.
 		pluginSource := component.Attributes.GetString(constants.PluginSourceAttribute, nil)
 		if pluginSource != "" && pluginSource != "parent" {
 			continue
