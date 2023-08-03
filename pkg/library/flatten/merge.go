@@ -165,7 +165,8 @@ func needsContainerContributionMerge(flattenedSpec *dw.DevWorkspaceTemplateSpec)
 				return false, fmt.Errorf("failed to parse %s attribute on component %s as true or false", constants.MergeContributionAttribute, component.Name)
 			}
 		} else {
-			if !component.Attributes.Exists(constants.PluginSourceAttribute) {
+			pluginSource := component.Attributes.GetString(constants.PluginSourceAttribute, nil)
+			if pluginSource == "" || pluginSource == "parent" {
 				// First, non-imported container component is implicitly selected as a contribution target
 				hasTarget = true
 			}
@@ -248,8 +249,9 @@ func findMergeTarget(flattenedSpec *dw.DevWorkspaceTemplateSpec) (mergeTargetCom
 			continue
 		}
 
-		// The target must not have been imported by a plugin or parent.
-		if component.Attributes.Exists(constants.PluginSourceAttribute) {
+		// The target must not have been imported by a plugin.
+		pluginSource := component.Attributes.GetString(constants.PluginSourceAttribute, nil)
+		if pluginSource != "" && pluginSource != "parent" {
 			continue
 		}
 
