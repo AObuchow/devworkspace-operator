@@ -58,7 +58,7 @@ jobs:
       with:
         context: .
         push: true
-        platforms: linux/amd64, linux/arm64, linux/ppc64le, linux/s390x
+        platforms: linux/amd64, linux/arm64
         tags: |
           quay.io/aobuchow/devworkspace-controller:next
           quay.io/aobuchow/devworkspace-controller:sha-${{ steps.git-sha.outputs.sha }}
@@ -69,7 +69,7 @@ jobs:
       with:
         context: .
         push: true
-        platforms: linux/amd64, linux/arm64, linux/ppc64le, linux/s390x
+        platforms: linux/amd64, linux/arm64
         tags: |
           quay.io/aobuchow/project-clone:next
           quay.io/aobuchow/project-clone:sha-${{ steps.git-sha.outputs.sha }}
