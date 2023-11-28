@@ -126,9 +126,10 @@ if [ "$DEBUG" == true ]; then
 fi
 
 info "Building bundle $PUSH_IMAGE"
-$PODMAN build -t "$PUSH_IMAGE" -f "${PROCESSED_DIR}/bundle.Dockerfile" "$PROCESSED_DIR" | sed 's|^|        |g'
-info "Pushing bundle $PUSH_IMAGE"
-$PODMAN push "$PUSH_IMAGE" 2>&1 | sed 's|^|        |g'
+docker buildx build . --platform linux/amd64,linux/arm64,linux/ppc64le,linux/s390x -t "$PUSH_IMAGE"  -f "${PROCESSED_DIR}/bundle.Dockerfile" "$PROCESSED_DIR" --push | sed 's|^|        |g'
+#$PODMAN build -t "$PUSH_IMAGE" -f "${PROCESSED_DIR}/bundle.Dockerfile" "$PROCESSED_DIR" | sed 's|^|        |g'
+#info "Pushing bundle $PUSH_IMAGE"
+#$PODMAN push "$PUSH_IMAGE" 2>&1 | sed 's|^|        |g'
 
 NEW_BUNDLE_SHA=$(skopeo inspect "docker://${PUSH_IMAGE}" | jq -r '.Digest')
 NEW_BUNDLE_DIGEST="${PUSH_IMAGE%%:*}@${NEW_BUNDLE_SHA}"
