@@ -118,7 +118,7 @@ fi
 make generate_olm_bundle_yaml
 
 echo "Setting up buildx builder"
-docker buildx create --name multiplatformbuilder --use
+docker buildx create --name multiplatformbuilder --driver docker-container --config build/buildkitd.toml --use
 
 echo "Building bundle image $BUNDLE_IMAGE"
 #$PODMAN build . -t "$BUNDLE_IMAGE" -f build/bundle.Dockerfile
