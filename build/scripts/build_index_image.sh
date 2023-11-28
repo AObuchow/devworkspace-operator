@@ -122,9 +122,9 @@ docker buildx create --name multiplatformbuilder --use
 
 echo "Building bundle image $BUNDLE_IMAGE"
 #$PODMAN build . -t "$BUNDLE_IMAGE" -f build/bundle.Dockerfile
-docker buildx build . --platform linux/amd64,linux/arm64,linux/ppc64le,linux/s390x -t "$BUNDLE_IMAGE"  -f build/bundle.Dockerfile
-nostalgic_brown
-$PODMAN push "$BUNDLE_IMAGE" 2>&1
+docker buildx build . --platform linux/amd64,linux/arm64,linux/ppc64le,linux/s390x -t "$BUNDLE_IMAGE"  -f build/bundle.Dockerfile --push
+
+#$PODMAN push "$BUNDLE_IMAGE" 2>&1
 
 BUNDLE_SHA=$(skopeo inspect "docker://${BUNDLE_IMAGE}" | jq -r '.Digest')
 BUNDLE_DIGEST="${BUNDLE_REPO}@${BUNDLE_SHA}"
@@ -184,9 +184,9 @@ opm validate "$OUTDIR"
 echo "Building index image $INDEX_IMAGE"
 #$PODMAN build . -t "$INDEX_IMAGE" -f "$DOCKERFILE"
 
-docker buildx build . --platform linux/amd64,linux/arm64,linux/ppc64le,linux/s390x -t "$INDEX_IMAGE"  -f "$DOCKERFILE"
+docker buildx build . --platform linux/amd64,linux/arm64,linux/ppc64le,linux/s390x -t "$INDEX_IMAGE"  -f "$DOCKERFILE" --push
 
-$PODMAN push "$INDEX_IMAGE" 2>&1
+#$PODMAN push "$INDEX_IMAGE" 2>&1
 
 if [ $DEBUG != "true" ] && [ "$RELEASE" != "true" ]; then
   echo "Cleaning up"
