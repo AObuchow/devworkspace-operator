@@ -204,8 +204,7 @@ jobs:
             --debug
 
           cp ./olm-catalog/next/{channel,package}.yaml ./olm-catalog/next-digest
-          docker build . -t ${DWO_DIGEST_INDEX_IMG} -f build/index.next-digest.Dockerfile
-          docker push ${DWO_DIGEST_INDEX_IMG}
+          docker buildx build . --platform linux/amd64,linux/arm64,linux/ppc64le,linux/s390x -t ${DWO_DIGEST_INDEX_IMG} -f build/index.next-digest.Dockerfile --push
 
           git restore ./olm-catalog/
           git clean -fd ./olm-catalog/
