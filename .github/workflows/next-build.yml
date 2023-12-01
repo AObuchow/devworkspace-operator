@@ -183,7 +183,7 @@ jobs:
             --bundle-tag ${DWO_BUNDLE_TAG} \
             --index-image ${DWO_INDEX_IMG} \
             --container-tool docker \
-            --multi-arch
+            --multi-arch \
             --debug \
             --force
 
@@ -194,7 +194,7 @@ jobs:
             --render ./olm-catalog/next-digest/ \
             --push "${DWO_BUNDLE_REPO}:${DWO_DIGEST_BUNDLE_TAG}" \
             --container-tool docker \
-            --multi-arch
+            --multi-arch \
             --debug
 
           cp ./olm-catalog/next/{channel,package}.yaml ./olm-catalog/next-digest
