@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2019-2023 Red Hat, Inc.
+// Copyright (c) 2019-2024 Red Hat, Inc.
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -40,6 +40,7 @@ func (h *WebhookHandler) ValidateDevfile(ctx context.Context, req admission.Requ
 	events := workspace.Events
 	projects := workspace.Projects
 	starterProjects := workspace.StarterProjects
+	dependentProjects := workspace.DependentProjects
 
 	var devfileErrors []string
 
@@ -56,6 +57,13 @@ func (h *WebhookHandler) ValidateDevfile(ctx context.Context, req admission.Requ
 		projectsErrors := devfilevalidation.ValidateProjects(projects)
 		if projectsErrors != nil {
 			devfileErrors = append(devfileErrors, projectsErrors.Error())
+		}
+	}
+
+	if dependentProjects != nil {
+		dependentProjectsErrors := devfilevalidation.ValidateProjects(dependentProjects)
+		if dependentProjectsErrors != nil {
+			devfileErrors = append(devfileErrors, dependentProjectsErrors.Error())
 		}
 	}
 

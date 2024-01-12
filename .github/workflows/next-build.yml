@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2019-2023 Red Hat, Inc.
+# Copyright (c) 2019-2024 Red Hat, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -31,6 +31,12 @@ jobs:
       git-sha: ${{ steps.git-sha.outputs.sha }}
 
     steps:
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
     - name: Checkout devworkspace-operator source code
       uses: actions/checkout@v3
 
@@ -50,6 +56,7 @@ jobs:
       with:
         context: .
         push: true
+        platforms: linux/amd64, linux/arm64, linux/ppc64le, linux/s390x
         tags: |
           quay.io/devfile/devworkspace-controller:next
           quay.io/devfile/devworkspace-controller:sha-${{ steps.git-sha.outputs.sha }}
@@ -60,6 +67,7 @@ jobs:
       with:
         context: .
         push: true
+        platforms: linux/amd64, linux/arm64, linux/ppc64le, linux/s390x
         tags: |
           quay.io/devfile/project-clone:next
           quay.io/devfile/project-clone:sha-${{ steps.git-sha.outputs.sha }}
@@ -175,6 +183,7 @@ jobs:
             --bundle-tag ${DWO_BUNDLE_TAG} \
             --index-image ${DWO_INDEX_IMG} \
             --container-tool docker \
+            --multi-arch \
             --debug \
             --force
 
@@ -185,11 +194,13 @@ jobs:
             --render ./olm-catalog/next-digest/ \
             --push "${DWO_BUNDLE_REPO}:${DWO_DIGEST_BUNDLE_TAG}" \
             --container-tool docker \
+            --multi-arch \
             --debug
 
           cp ./olm-catalog/next/{channel,package}.yaml ./olm-catalog/next-digest
-          docker build . -t ${DWO_DIGEST_INDEX_IMG} -f build/index.next-digest.Dockerfile
-          docker push ${DWO_DIGEST_INDEX_IMG}
+          docker buildx build . -t ${DWO_DIGEST_INDEX_IMG} -f build/index.next-digest.Dockerfile \
+          --platform linux/amd64,linux/arm64,linux/ppc64le,linux/s390x \
+          --push
 
           git restore ./olm-catalog/
           git clean -fd ./olm-catalog/

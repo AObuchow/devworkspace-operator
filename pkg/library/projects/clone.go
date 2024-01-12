@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2019-2023 Red Hat, Inc.
+// Copyright (c) 2019-2024 Red Hat, Inc.
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -18,6 +18,7 @@ package projects
 
 import (
 	"fmt"
+	"strings"
 
 	dw "github.com/devfile/api/v2/pkg/apis/workspaces/v1alpha2"
 	controllerv1alpha1 "github.com/devfile/devworkspace-operator/apis/controller/v1alpha1"
@@ -40,12 +41,56 @@ type Options struct {
 	Env        []corev1.EnvVar
 }
 
+// ValidateAllProjectsvalidates that no two projects, dependentProjects or starterProjects (if one is selected) share
+// the same name or cloned path
+func ValidateAllProjects(workspace *dw.DevWorkspaceTemplateSpec) error {
+	// Map of project names to project sources (project, dependentProject, starterProject)
+	projectNames := map[string][]string{}
+	// Map of project clone paths to project sources ("project <name>", "starterProject <name>", "dependentProject <name>")
+	clonePaths := map[string][]string{}
+
+	for idx, project := range workspace.Projects {
+		projectNames[project.Name] = append(projectNames[project.Name], "projects")
+		clonePath := GetClonePath(&workspace.Projects[idx])
+		clonePaths[clonePath] = append(clonePaths[clonePath], fmt.Sprintf("project %s", project.Name))
+	}
+
+	for idx, project := range workspace.DependentProjects {
+		projectNames[project.Name] = append(projectNames[project.Name], "dependentProjects")
+		clonePath := GetClonePath(&workspace.DependentProjects[idx])
+		clonePaths[clonePath] = append(clonePaths[clonePath], fmt.Sprintf("dependentProject %s", project.Name))
+	}
+
+	starterProject, err := GetStarterProject(workspace)
+	if err != nil {
+		return err
+	}
+	if starterProject != nil {
+		projectNames[starterProject.Name] = append(projectNames[starterProject.Name], "starterProjects")
+		// Starter projects do not have a clonePath field
+		clonePaths[starterProject.Name] = append(clonePaths[starterProject.Name], fmt.Sprintf("starterProject %s", starterProject.Name))
+	}
+
+	for projectName, projectTypes := range projectNames {
+		if len(projectTypes) > 1 {
+			return fmt.Errorf("found multiple projects with the same name '%s' in: %s", projectName, strings.Join(projectTypes, ", "))
+		}
+	}
+	for clonePath, projects := range clonePaths {
+		if len(projects) > 1 {
+			return fmt.Errorf("found multiple projects with the same clone path (%s): %s", clonePath, strings.Join(projects, ", "))
+		}
+	}
+
+	return nil
+}
+
 func GetProjectCloneInitContainer(workspace *dw.DevWorkspaceTemplateSpec, options Options, proxyConfig *controllerv1alpha1.Proxy) (*corev1.Container, error) {
 	starterProject, err := GetStarterProject(workspace)
 	if err != nil {
 		return nil, err
 	}
-	if len(workspace.Projects) == 0 && starterProject == nil {
+	if len(workspace.Projects) == 0 && len(workspace.DependentProjects) == 0 && starterProject == nil {
 		return nil, nil
 	}
 	if workspace.Attributes.GetString(constants.ProjectCloneAttribute, nil) == constants.ProjectCloneDisable {

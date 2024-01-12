@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2019-2023 Red Hat, Inc.
+// Copyright (c) 2019-2024 Red Hat, Inc.
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -48,5 +48,11 @@ func AddSourceAttributesForTemplate(sourceID string, template *dw.DevWorkspaceTe
 			template.StarterProjects[idx].Attributes = attributes.Attributes{}
 		}
 		template.StarterProjects[idx].Attributes.PutString(constants.PluginSourceAttribute, sourceID)
+	}
+	for idx, project := range template.DependentProjects {
+		if project.Attributes == nil {
+			template.DependentProjects[idx].Attributes = attributes.Attributes{}
+		}
+		template.DependentProjects[idx].Attributes.PutString(constants.PluginSourceAttribute, sourceID)
 	}
 }

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2019-2023 Red Hat, Inc.
+// Copyright (c) 2019-2024 Red Hat, Inc.
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -323,6 +323,10 @@ func (r *DevWorkspaceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return r.failWorkspace(workspace, fmt.Sprintf("Failed to process workspace environment variables: %s", err), metrics.ReasonBadRequest, reqLogger, &reconcileStatus), nil
 	}
 
+	// Validate that projects, dependentProjects, and starterProjects do not collide
+	if err := projects.ValidateAllProjects(&workspace.Spec.Template); err != nil {
+		return r.failWorkspace(workspace, fmt.Sprintf("Invalid devfile: %s", err), metrics.ReasonBadRequest, reqLogger, &reconcileStatus), nil
+	}
 	// Add init container to clone projects
 	projectCloneOptions := projects.Options{
 		Image:     workspace.Config.Workspace.ProjectCloneConfig.Image,

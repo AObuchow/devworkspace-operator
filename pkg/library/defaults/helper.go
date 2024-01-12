@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2019-2023 Red Hat, Inc.
+// Copyright (c) 2019-2024 Red Hat, Inc.
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -28,8 +28,10 @@ func ApplyDefaultTemplate(workspace *common.DevWorkspaceWithConfig) {
 	}
 	defaultCopy := workspace.Config.Workspace.DefaultTemplate.DeepCopy()
 	originalProjects := workspace.Spec.Template.Projects
+	originalDependentProjects := workspace.Spec.Template.DependentProjects
 	workspace.Spec.Template.DevWorkspaceTemplateSpecContent = *defaultCopy
 	workspace.Spec.Template.Projects = append(workspace.Spec.Template.Projects, originalProjects...)
+	workspace.Spec.Template.DependentProjects = append(workspace.Spec.Template.DependentProjects, originalDependentProjects...)
 }
 
 func NeedsDefaultTemplate(workspace *common.DevWorkspaceWithConfig) bool {
