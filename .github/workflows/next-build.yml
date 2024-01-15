@@ -51,6 +51,20 @@ jobs:
         password: ${{ secrets.QUAY_PASSWORD }}
         registry: quay.io
 
+
+    - name: Release-test
+      run: |
+        # Need to grab goimports otherwise formatting after this step will fail
+        # PR checks.
+        go install golang.org/x/tools/cmd/goimports@latest
+
+        git config --global user.name "Andrew Obuchowicz"
+        git config --global user.email "aobuchow@redhat.com"
+
+        export GITHUB_TOKEN=test
+
+        ./make-release.sh --version 0.25.0
+
     - name: Build and push
       uses: docker/build-push-action@v3
       with:
