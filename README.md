@@ -8,6 +8,7 @@ Dev Workspace operator repository that contains the controller for the DevWorksp
 
 ## Configuration
 
+
 ### Global configuration for the DevWorkspace Operator
 
 The DevWorkspace Operator installs the DevWorkspaceOperatorConfig custom resource (short name: `dwoc`). To configure global behavior of the DevWorkspace Operator, create a DevWorkspaceOperatorConfig named `devworkspace-operator-config` in the same namespace where the operator is deployed:
