@@ -53,6 +53,7 @@ func convertDevfileEndpoint(dwEndpoint dw.Endpoint) v1alpha1.Endpoint {
 		Secure:     convertSecure(dwEndpoint.Secure),
 		Path:       dwEndpoint.Path,
 		Attributes: v1alpha1.Attributes(dwEndpoint.Attributes),
+		Annotations: dwEndpoint.Annotations,
 	}
 }
 
