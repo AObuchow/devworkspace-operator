@@ -60,6 +60,11 @@ spec:
                 additionalProperties:
                   items:
                     properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        description: 'TODO: Document'
+                        type: object
                       attributes:
                         description: "Map of implementation-dependant string-based
                           free-form attributes. \n Examples of Che-specific attributes:
