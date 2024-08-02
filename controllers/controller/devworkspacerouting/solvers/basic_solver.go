@@ -22,18 +22,20 @@ import (
 	"github.com/devfile/devworkspace-operator/pkg/infrastructure"
 )
 
-var routeAnnotations = func(endpointName string) map[string]string {
+var routeAnnotations = func(endpointName, componentName string) map[string]string {
 	return map[string]string{
-		"haproxy.router.openshift.io/rewrite-target": "/",
-		constants.DevWorkspaceEndpointNameAnnotation: endpointName,
+		"haproxy.router.openshift.io/rewrite-target":  "/",
+		constants.DevWorkspaceEndpointNameAnnotation:  endpointName,
+		constants.DevWorkspaceComponentNameAnnotation: componentName,
 	}
 }
 
-var nginxIngressAnnotations = func(endpointName string) map[string]string {
+var nginxIngressAnnotations = func(endpointName, componentName string) map[string]string {
 	return map[string]string{
-		"nginx.ingress.kubernetes.io/rewrite-target": "/",
-		"nginx.ingress.kubernetes.io/ssl-redirect":   "false",
-		constants.DevWorkspaceEndpointNameAnnotation: endpointName,
+		"nginx.ingress.kubernetes.io/rewrite-target":  "/",
+		"nginx.ingress.kubernetes.io/ssl-redirect":    "false",
+		constants.DevWorkspaceEndpointNameAnnotation:  endpointName,
+		constants.DevWorkspaceComponentNameAnnotation: componentName,
 	}
 }
 
