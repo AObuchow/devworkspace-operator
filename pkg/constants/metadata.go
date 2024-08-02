@@ -137,6 +137,9 @@ const (
 	// DevWorkspaceEndpointNameAnnotation is the annotation key for storing an endpoint's name from the devfile representation
 	DevWorkspaceEndpointNameAnnotation = "controller.devfile.io/endpoint_name"
 
+	// DevWorkspaceComponentNameAnnotation is the annotation key for storing a component's name from the devfile representation
+	DevWorkspaceComponentNameAnnotation = "controller.devfile.io/component_name"
+
 	// DevWorkspaceDiscoverableServiceAnnotation marks a service in a devworkspace as created for a discoverable endpoint,
 	// as opposed to a service created to support the devworkspace itself.
 	DevWorkspaceDiscoverableServiceAnnotation = "controller.devfile.io/discoverable-service"

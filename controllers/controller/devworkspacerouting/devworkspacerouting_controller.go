@@ -251,22 +251,12 @@ func (r *DevWorkspaceRoutingReconciler) Reconcile(ctx context.Context, req ctrl.
 func addEndpointAnnotations(clusterRoutingObj metav1.ObjectMeta, instance *controllerv1alpha1.DevWorkspaceRouting) {
 	if clusterRoutingObj.Annotations != nil {
 		endpointName := ""
-		// Check for DWO-created ingress/route
 		if val, ok := clusterRoutingObj.Annotations[constants.DevWorkspaceEndpointNameAnnotation]; ok {
 			endpointName = val
 		}
-		// Check for Che-created ingress/route
-		cheEndpointNameAnnotation := "che.routing.controller.devfile.io/endpoint-name"
-		if val, ok := clusterRoutingObj.Annotations[cheEndpointNameAnnotation]; ok {
-			endpointName = val
-		}
 
-		// TODO: This feels weird.. look into what the machine name should be..
-		// Machine name is same as component name
-		cheEndpointMachineNameAnnotation := "che.routing.controller.devfile.io/component-name"
 		machineName := ""
-
-		if val, ok := clusterRoutingObj.Annotations[cheEndpointMachineNameAnnotation]; ok {
+		if val, ok := clusterRoutingObj.Annotations[constants.DevWorkspaceComponentNameAnnotation]; ok {
 			machineName = val
 		}
 
